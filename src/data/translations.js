@@ -9,6 +9,7 @@ const translations = {
       facilities: "सुविधाएं",
       gallery: "गैलरी",
       contact: "संपर्क",
+      planner: "योजनाकार",
     },
     hero: {
       title: "श्री खेमज माता मंदिर",
@@ -245,6 +246,7 @@ const translations = {
       facilities: "Facilities",
       gallery: "Gallery",
       contact: "Contact",
+      planner: "Planner",
     },
     hero: {
       title: "Shri Khemaj Mata Temple",
@@ -481,6 +483,7 @@ const translations = {
       facilities: "સુવિધાઓ",
       gallery: "ગૅલેરી",
       contact: "સંપર્ક",
+      planner: "આયોજક",
     },
     hero: {
       title: "શ્રી ખેમજ માતા મંદિર",

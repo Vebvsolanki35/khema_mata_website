@@ -13,6 +13,7 @@ import Facilities from "./pages/Facilities";
 import Gallery from "./pages/Gallery";
 import Contact from "./pages/Contact";
 import Admin from "./pages/Admin";
+import Planner from "./pages/Planner";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <Route path="/facilities" element={<Facilities />} />
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/planner" element={<Planner />} />
         <Route path="/admin/login" element={<Admin />} />
         <Route
           path="/admin"
