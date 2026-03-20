@@ -10,6 +10,7 @@ const translations = {
       gallery: "गैलरी",
       contact: "संपर्क",
       planner: "योजनाकार",
+      calendar: "पंचांग",
     },
     hero: {
       title: "श्री खेमज माता मंदिर",
@@ -247,6 +248,7 @@ const translations = {
       gallery: "Gallery",
       contact: "Contact",
       planner: "Planner",
+      calendar: "Calendar",
     },
     hero: {
       title: "Shri Khemaj Mata Temple",
@@ -484,6 +486,7 @@ const translations = {
       gallery: "ગૅલેરી",
       contact: "સંપર્ક",
       planner: "આયોજક",
+      calendar: "પंचांग",
     },
     hero: {
       title: "શ્રી ખેમજ માતા મંદિર",

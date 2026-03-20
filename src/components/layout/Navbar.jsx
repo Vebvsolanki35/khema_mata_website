@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage } from "../../context/useLanguage";
 import { WHATSAPP_NUMBER } from "../../config/constants";
 
 function Navbar() {
   const { language, setLanguage, t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const activeCls = "font-bold border-b-2 pb-0.5";
-  const baseCls = "transition-colors hover:opacity-80 text-sm";
-
-  const linkClass = ({ isActive }) =>
-    isActive ? `${baseCls} ${activeCls}` : baseCls;
 
   const navLinks = [
     { to: "/", label: t.nav.home },
@@ -21,6 +15,7 @@ function Navbar() {
     { to: "/donation", label: t.nav.donation },
     { to: "/facilities", label: t.nav.facilities },
     { to: "/gallery", label: t.nav.gallery },
+    { to: "/calendar", label: t.nav.calendar },
     { to: "/contact", label: t.nav.contact },
     { to: "/planner", label: t.nav.planner },
   ];
