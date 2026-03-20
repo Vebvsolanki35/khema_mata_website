@@ -1,1 +1,169 @@
 @import "tailwindcss";
+
+:root {
+  --maroon: #8B1A1A;
+  --saffron: #FF6B00;
+  --cream: #FFF8F0;
+  --gold: #D4AF37;
+  --maroon-dark: #6B1313;
+  --saffron-light: #FF8C42;
+}
+
+body {
+  font-family: 'Tiro Devanagari Hindi', serif;
+  background-color: var(--cream);
+  color: #2D1B0E;
+}
+
+/* Ticker */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.ticker-text {
+  display: inline-block;
+  animation: ticker-scroll 30s linear infinite;
+  white-space: nowrap;
+}
+
+/* Stats counter animation */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.7s ease forwards; }
+
+/* Floating buttons */
+.float-btn {
+  position: fixed;
+  z-index: 999;
+  border-radius: 50px;
+  padding: 12px 20px;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+.float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+}
+.float-whatsapp {
+  bottom: 80px;
+  right: 20px;
+  background: #25D366;
+  color: white;
+}
+.float-donate {
+  bottom: 140px;
+  right: 20px;
+  background: var(--gold);
+  color: #2D1B0E;
+}
+
+/* Hero overlay */
+.hero-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(139, 26, 26, 0.7) 0%,
+    rgba(139, 26, 26, 0.4) 50%,
+    rgba(139, 26, 26, 0.8) 100%
+  );
+}
+
+/* Gold divider */
+.gold-divider {
+  height: 3px;
+  background: linear-gradient(to right, transparent, var(--gold), transparent);
+  margin: 2rem 0;
+}
+
+/* Card hover */
+.temple-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+.temple-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(139, 26, 26, 0.15);
+}
+
+/* Table */
+.info-table th {
+  background: var(--maroon);
+  color: var(--gold);
+  padding: 10px 16px;
+  font-weight: 600;
+}
+.info-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(212,175,55,0.2);
+}
+.info-table tr:nth-child(even) td {
+  background: rgba(255, 107, 0, 0.05);
+}
+
+/* Timeline */
+.timeline-line {
+  border-left: 3px solid var(--gold);
+}
+
+/* Masonry gallery */
+.masonry-grid {
+  columns: 2;
+  column-gap: 12px;
+}
+@media (min-width: 640px) {
+  .masonry-grid { columns: 3; }
+}
+@media (min-width: 1024px) {
+  .masonry-grid { columns: 4; }
+}
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.masonry-item img {
+  width: 100%;
+  display: block;
+  transition: transform 0.3s;
+}
+.masonry-item:hover img {
+  transform: scale(1.04);
+}
+
+/* Sticky nav */
+.sticky-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+/* Section headings */
+.section-title {
+  font-family: 'Tiro Devanagari Hindi', serif;
+  color: var(--maroon);
+  text-align: center;
+  position: relative;
+  padding-bottom: 1rem;
+  margin-bottom: 2rem;
+}
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(to right, var(--saffron), var(--gold));
+  border-radius: 2px;
+}
