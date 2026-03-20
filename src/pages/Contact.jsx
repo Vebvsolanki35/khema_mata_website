@@ -3,14 +3,19 @@ import { useLanguage } from "../context/LanguageContext";
 import { useContactForm } from "../hooks/useContactForm";
 
 const WHATSAPP_NUMBER = "919001234567";
-const UPI_ID = "khemajmata@upi";
 
 function Contact() {
   const { t } = useLanguage();
   const c = t.contact;
 
-  const [form, setForm] = useState({ name: "", phone: "", message: "" });
-  const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    city: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
   const { submit, loading, success, error } = useContactForm();
 
   const handleChange = (e) => {
@@ -19,135 +24,259 @@ function Contact() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const ok = await submit(form);
+    const ok = await submit({ name: form.name, phone: form.phone, message: `${form.subject}: ${form.message} | City: ${form.city} | Email: ${form.email}` });
     if (ok) {
       const msg = encodeURIComponent(
-        `${c.nameLabel}: ${form.name}\n${c.phoneLabel}: ${form.phone}\n${c.messageLabel}: ${form.message}`
+        `🙏 खेमज माता मंदिर\n` +
+        `${c.nameLabel}: ${form.name}\n` +
+        `${c.phoneLabel}: ${form.phone}\n` +
+        `${c.cityLabel}: ${form.city}\n` +
+        `${c.subjectLabel}: ${form.subject}\n` +
+        `${c.messageLabel}: ${form.message}`
       );
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(UPI_ID).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const handleDonate = (amount) => {
-    const msg = encodeURIComponent(`Donation of ₹${amount} to Khemaj Mata Temple`);
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
-  };
-
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="text-3xl md:text-4xl font-bold text-orange-700 text-center mb-10">
-        📞 {c.title}
-      </h1>
-
-      {/* Contact Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-2xl shadow-lg p-6 mb-10 space-y-4 border border-orange-100"
+    <main>
+      {/* Hero */}
+      <section
+        className="py-16 px-4 text-center"
+        style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
       >
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {c.nameLabel}
-          </label>
-          <input
-            type="text"
-            name="name"
-            required
-            value={form.name}
-            onChange={handleChange}
-            placeholder={c.namePlaceholder}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {c.phoneLabel}
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            required
-            value={form.phone}
-            onChange={handleChange}
-            placeholder={c.phonePlaceholder}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {c.messageLabel}
-          </label>
-          <textarea
-            name="message"
-            rows={4}
-            value={form.message}
-            onChange={handleChange}
-            placeholder={c.messagePlaceholder}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+        <div className="text-5xl mb-4">📞</div>
+        <h1
+          className="text-3xl md:text-4xl font-bold mb-2"
+          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
         >
-          {loading ? (
-            <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>💬 {c.submit}</>
-          )}
-        </button>
-        {success && (
-          <p className="text-green-600 text-sm text-center font-medium">
-            ✅ Message saved successfully!
-          </p>
-        )}
-        {error && (
-          <p className="text-red-500 text-sm text-center">{error}</p>
-        )}
-      </form>
+          {c.title}
+        </h1>
+      </section>
 
-      {/* Donation Section */}
-      <div className="bg-amber-50 rounded-2xl shadow p-6 border border-orange-200">
-        <h2 className="text-xl font-bold text-orange-700 mb-4 text-center">
-          🙏 {c.donationTitle}
-        </h2>
-
-        {/* UPI ID */}
-        <div className="flex items-center gap-3 bg-white rounded-xl border border-orange-200 px-4 py-3 mb-5">
-          <div>
-            <p className="text-xs text-gray-500">{c.upiLabel}</p>
-            <p className="font-bold text-gray-800">{UPI_ID}</p>
-          </div>
-          <button
-            onClick={handleCopy}
-            className={`ml-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              copied
-                ? "bg-green-500 text-white"
-                : "bg-orange-500 text-white hover:bg-orange-600"
-            }`}
+      <div className="max-w-5xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-5 gap-10">
+        {/* Contact Form */}
+        <div className="lg:col-span-3">
+          <form
+            onSubmit={handleSubmit}
+            className="bg-white rounded-2xl shadow-lg p-6 space-y-4"
+            style={{ border: "1px solid rgba(212,175,55,0.3)" }}
           >
-            {copied ? c.copied : c.copyBtn}
-          </button>
+            {/* Row 1: Name + Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                  {c.nameLabel} *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder={c.namePlaceholder}
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: "rgba(212,175,55,0.4)", focusRingColor: "var(--saffron)" }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                  {c.phoneLabel} *
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  required
+                  value={form.phone}
+                  onChange={handleChange}
+                  placeholder={c.phonePlaceholder}
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: "rgba(212,175,55,0.4)" }}
+                />
+              </div>
+            </div>
+
+            {/* Row 2: City + Email */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                  {c.cityLabel}
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder={c.cityPlaceholder}
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: "rgba(212,175,55,0.4)" }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                  {c.emailLabel}
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder={c.emailPlaceholder}
+                  className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: "rgba(212,175,55,0.4)" }}
+                />
+              </div>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                {c.subjectLabel}
+              </label>
+              <select
+                name="subject"
+                value={form.subject}
+                onChange={handleChange}
+                className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white"
+                style={{ borderColor: "rgba(212,175,55,0.4)" }}
+              >
+                <option value="">-- {c.subjectLabel} --</option>
+                {c.subjects.map((s, i) => (
+                  <option key={i} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-sm font-semibold mb-1" style={{ color: "var(--maroon)" }}>
+                {c.messageLabel}
+              </label>
+              <textarea
+                name="message"
+                rows={4}
+                value={form.message}
+                onChange={handleChange}
+                placeholder={c.messagePlaceholder}
+                className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none"
+                style={{ borderColor: "rgba(212,175,55,0.4)" }}
+              />
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-bold text-base transition-colors flex items-center justify-center gap-2"
+              style={{ backgroundColor: "#25D366", color: "white" }}
+            >
+              {loading ? (
+                <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>💬 {c.submit}</>
+              )}
+            </button>
+
+            {success && (
+              <p className="text-green-600 text-sm text-center font-medium">
+                ✅ संदेश सफलतापूर्वक भेजा गया!
+              </p>
+            )}
+            {error && (
+              <p className="text-red-500 text-sm text-center">{error}</p>
+            )}
+          </form>
         </div>
 
-        {/* Donation buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {c.donateAmounts.map((amt, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleDonate(c.donateValues[idx])}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-lg transition-colors shadow"
+        {/* Right Panel: Address + WhatsApp Groups */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Address Card */}
+          <div
+            className="rounded-2xl p-6"
+            style={{ backgroundColor: "var(--maroon)", border: "1px solid var(--gold)" }}
+          >
+            <h3
+              className="font-bold text-lg mb-4"
+              style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
             >
-              {amt}
-            </button>
-          ))}
+              📍 {c.addressTitle}
+            </h3>
+            <div className="space-y-3 text-sm" style={{ color: "#FFF8F0" }}>
+              <p>🛕 श्री खेमज माता मंदिर न्यास</p>
+              <p>📌 देई, बूंदी, राजस्थान ३२३८०२</p>
+              <p>⏰ प्रातः ५:०० – १२:०० | सायं ४:०० – ९:००</p>
+              <p>🎉 चैत्र नवरात्रि (मार्च–अप्रैल)</p>
+              <p>🎉 शारदीय नवरात्रि (अक्टूबर)</p>
+            </div>
+          </div>
+
+          {/* WhatsApp Groups */}
+          <div
+            className="rounded-2xl p-6"
+            style={{ backgroundColor: "var(--cream)", border: "1px solid rgba(212,175,55,0.4)" }}
+          >
+            <h3
+              className="font-bold text-lg mb-4"
+              style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+            >
+              💬 WhatsApp Groups
+            </h3>
+            <div className="space-y-3">
+              {c.whatsappGroups.map((grp, i) => (
+                <a
+                  key={i}
+                  href={grp.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl font-semibold text-sm transition-colors hover:opacity-80"
+                  style={{ backgroundColor: "#25D366", color: "white" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                  {grp.name}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Social Links */}
+          <div
+            className="rounded-2xl p-6"
+            style={{ backgroundColor: "white", border: "1px solid rgba(212,175,55,0.3)" }}
+          >
+            <h3
+              className="font-bold text-lg mb-4"
+              style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+            >
+              🌐 सोशल मीडिया
+            </h3>
+            <div className="flex gap-3">
+              <a
+                href="#"
+                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white"
+                style={{ backgroundColor: "#1877F2" }}
+              >
+                📘 Facebook
+              </a>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white"
+                style={{ backgroundColor: "#25D366" }}
+              >
+                💬 WhatsApp
+              </a>
+              <a
+                href="#"
+                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white"
+                style={{ backgroundColor: "#FF0000" }}
+              >
+                ▶ YouTube
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </main>

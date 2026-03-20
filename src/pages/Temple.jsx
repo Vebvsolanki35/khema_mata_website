@@ -4,74 +4,145 @@ function Temple() {
   const { t } = useLanguage();
   const tp = t.temple;
 
-  const timeline = [
-    {
-      year: "940 CE",
-      label: tp.founded,
-      desc: tp.foundedDesc,
-      icon: "🏛️",
-      color: "border-orange-400",
-    },
-    {
-      year: "1094 CE",
-      label: tp.renovated,
-      desc: tp.renovatedDesc,
-      icon: "🔨",
-      color: "border-amber-500",
-    },
-    {
-      year: "~1600s",
-      label: tp.mughal,
-      desc: tp.mughalDesc,
-      icon: "🛡️",
-      color: "border-yellow-500",
-    },
-  ];
-
   return (
-    <main className="max-w-4xl mx-auto px-4 py-10">
-      <h1 className="text-3xl md:text-4xl font-bold text-orange-700 text-center mb-10">
-        🕌 {tp.title}
-      </h1>
+    <main>
+      {/* Hero Banner */}
+      <section
+        className="relative py-20 px-4 text-center"
+        style={{
+          backgroundImage: "linear-gradient(135deg, var(--maroon) 0%, #6B1313 100%)",
+        }}
+      >
+        <div className="text-5xl mb-4">🛕</div>
+        <h1
+          className="text-3xl md:text-5xl font-bold mb-2"
+          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+        >
+          {tp.title}
+        </h1>
+        <p className="text-lg" style={{ color: "#FFF8F0" }}>
+          {tp.subtitle}
+        </p>
+      </section>
 
-      {/* Timeline */}
-      <section className="mb-12">
-        <div className="relative border-l-4 border-orange-200 ml-4 pl-6 space-y-10">
-          {timeline.map((item) => (
-            <div key={item.year} className="relative">
-              <span className="absolute -left-9 top-0 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {item.year}
-              </span>
-              <div className={`bg-white rounded-2xl shadow p-5 border-l-4 ${item.color}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">{item.icon}</span>
-                  <h3 className="text-lg font-bold text-orange-700">{item.label}</h3>
-                </div>
-                <p className="text-gray-700 leading-relaxed">{item.desc}</p>
-              </div>
-            </div>
-          ))}
+      {/* Temple Info Table */}
+      <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
+        <div className="max-w-3xl mx-auto">
+          <h2 className="section-title text-2xl font-bold">{tp.infoTitle}</h2>
+          <div className="rounded-2xl overflow-hidden shadow-lg mt-8" style={{ border: "1px solid var(--gold)" }}>
+            <table className="info-table w-full">
+              <tbody>
+                {tp.info.map((row, i) => (
+                  <tr key={i}>
+                    <th className="text-left w-1/3">{row.label}</th>
+                    <td className="text-gray-800">{row.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p
+            className="mt-4 text-center font-semibold py-3 rounded-xl"
+            style={{ color: "var(--maroon)", backgroundColor: "rgba(212,175,55,0.15)", border: "1px solid var(--gold)" }}
+          >
+            {tp.freeEntry}
+          </p>
         </div>
       </section>
 
-      {/* Solanki Kings List */}
-      <section>
-        <h2 className="text-2xl font-bold text-orange-700 mb-6 text-center">
-          👑 {tp.kingsTitle}
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {tp.kings.map((king, idx) => (
-            <div
-              key={idx}
-              className="bg-amber-50 rounded-xl border border-orange-200 p-4 flex items-center gap-3"
-            >
-              <span className="text-2xl">👑</span>
-              <div>
-                <p className="font-semibold text-gray-800">{king.name}</p>
-                <p className="text-sm text-orange-600">{king.years}</p>
-              </div>
+      <div className="gold-divider mx-8" />
+
+      {/* Darshan Timings + Aarti */}
+      <section className="py-12 px-4 bg-white">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
+          {/* Darshan */}
+          <div>
+            <h2 className="section-title text-xl font-bold">{tp.darshanTitle}</h2>
+            <div className="space-y-3 mt-6">
+              {[
+                { icon: "🌅", label: t.darshan.morning, time: t.darshan.morningTime },
+                { icon: "🌇", label: t.darshan.evening, time: t.darshan.eveningTime },
+                { icon: "🎉", label: t.darshan.navratri, time: t.darshan.navratriTime },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 p-4 rounded-xl"
+                  style={{ backgroundColor: "var(--cream)", border: "1px solid rgba(212,175,55,0.3)" }}
+                >
+                  <span className="text-2xl">{item.icon}</span>
+                  <div>
+                    <p className="text-sm text-gray-500">{item.label}</p>
+                    <p className="font-bold" style={{ color: "var(--saffron)" }}>{item.time}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Aarti Schedule */}
+          <div>
+            <h2 className="section-title text-xl font-bold">{tp.aartiTitle}</h2>
+            <div className="space-y-3 mt-6">
+              {tp.aartis.map((a, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-4 rounded-xl"
+                  style={{ backgroundColor: "var(--cream)", borderLeft: "4px solid var(--gold)" }}
+                >
+                  <span
+                    className="font-semibold"
+                    style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+                  >
+                    🔔 {a.name}
+                  </span>
+                  <span className="font-bold" style={{ color: "var(--saffron)" }}>{a.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* History */}
+      <section className="py-12 px-4" style={{ backgroundColor: "#FFF0E0" }}>
+        <div className="max-w-3xl mx-auto">
+          <h2 className="section-title text-2xl font-bold">{tp.historyTitle}</h2>
+          <div className="space-y-5 mt-8">
+            {[tp.historyPara1, tp.historyPara2, tp.historyPara3].map((para, i) => (
+              <p
+                key={i}
+                className="text-gray-700 leading-relaxed text-base md:text-lg"
+                style={{ fontFamily: "'Tiro Devanagari Hindi', serif" }}
+              >
+                {para}
+              </p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Festivals */}
+      <section className="py-12 px-4 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="section-title text-2xl font-bold">{tp.festivalTitle}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
+            {tp.festivals.map((f, i) => (
+              <div
+                key={i}
+                className="temple-card rounded-2xl p-6 text-center"
+                style={{ backgroundColor: "var(--cream)" }}
+              >
+                <div className="text-3xl mb-3">🎉</div>
+                <h3
+                  className="font-bold text-lg mb-2"
+                  style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+                >
+                  {f.name}
+                </h3>
+                <p className="text-sm text-gray-600">{f.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </main>
