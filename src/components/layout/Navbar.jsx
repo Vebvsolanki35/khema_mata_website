@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
-
-const WHATSAPP_NUMBER = "919001234567";
+import { WHATSAPP_NUMBER } from "../../config/constants";
 
 function Navbar() {
   const { language, setLanguage, t } = useLanguage();
@@ -190,7 +189,7 @@ function Navbar() {
               style={{ backgroundColor: "var(--gold)", color: "var(--maroon)" }}
               onClick={() => setMenuOpen(false)}
             >
-              🙏 दान करें
+              {t.mobileDonateBtnLabel}
             </Link>
           </div>
         </div>

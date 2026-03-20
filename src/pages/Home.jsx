@@ -127,7 +127,7 @@ function Home() {
       <section className="py-16 px-4" style={{ backgroundColor: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
           <h2 className="section-title text-2xl md:text-3xl font-bold">
-            🙏 त्वरित सेवाएं
+            🙏 {t.quickServicesTitle}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
             {t.quickCards.map((card, i) => (

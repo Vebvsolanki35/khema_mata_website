@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
-
-const WHATSAPP_NUMBER = "919001234567";
+import { WHATSAPP_NUMBER } from "../config/constants";
 
 function Donation() {
   const { t } = useLanguage();

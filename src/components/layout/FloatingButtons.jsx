@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
-
-const WHATSAPP_NUMBER = "919001234567";
+import { WHATSAPP_NUMBER } from "../../config/constants";
 
 function FloatingButtons() {
   return (

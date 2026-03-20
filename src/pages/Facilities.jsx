@@ -56,7 +56,7 @@ function Facilities() {
               className="py-3 px-4 text-center font-bold"
               style={{ backgroundColor: "var(--maroon)", color: "var(--gold)" }}
             >
-              🔔 दैनिक आरती सूची
+              {t.aartiTableTitle}
             </div>
             {aartis.map((a, i) => (
               <div

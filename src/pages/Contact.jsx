@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
 import { useContactForm } from "../hooks/useContactForm";
-
-const WHATSAPP_NUMBER = "919001234567";
+import { WHATSAPP_NUMBER } from "../config/constants";
 
 function Contact() {
   const { t } = useLanguage();
@@ -249,12 +248,14 @@ function Contact() {
               className="font-bold text-lg mb-4"
               style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
             >
-              🌐 सोशल मीडिया
+              🌐 {t.socialTitle}
             </h3>
             <div className="flex gap-3">
               <a
                 href="#"
-                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white"
+                title={t.comingSoon}
+                onClick={e => e.preventDefault()}
+                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white opacity-75 cursor-not-allowed"
                 style={{ backgroundColor: "#1877F2" }}
               >
                 📘 Facebook
@@ -270,7 +271,9 @@ function Contact() {
               </a>
               <a
                 href="#"
-                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white"
+                title={t.comingSoon}
+                onClick={e => e.preventDefault()}
+                className="flex-1 text-center py-2.5 rounded-xl font-bold text-sm text-white opacity-75 cursor-not-allowed"
                 style={{ backgroundColor: "#FF0000" }}
               >
                 ▶ YouTube

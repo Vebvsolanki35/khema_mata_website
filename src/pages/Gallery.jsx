@@ -91,7 +91,11 @@ function Gallery() {
               ✕ {t.gallery.close}
             </button>
             <img
-              src={selected.src.replace("w=400", "w=1200")}
+              src={
+                new URL(selected.src).hostname === "images.unsplash.com"
+                  ? selected.src.replace("w=400", "w=1200")
+                  : selected.src
+              }
               alt={selected.alt}
               className="w-full rounded-2xl shadow-2xl"
               style={{ maxHeight: "80vh", objectFit: "contain" }}

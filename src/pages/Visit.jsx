@@ -1,4 +1,5 @@
 import { useLanguage } from "../context/LanguageContext";
+import { WHATSAPP_NUMBER } from "../config/constants";
 
 function Visit() {
   const { t } = useLanguage();
@@ -81,7 +82,7 @@ function Visit() {
                     className="mt-3 inline-block w-full text-center py-2 rounded-lg text-sm font-bold transition-colors"
                     style={{ backgroundColor: "var(--saffron)", color: "white" }}
                   >
-                    🗺️ Google Maps में खोलें
+                    {v.openInMaps}
                   </a>
                 </div>
               </div>
