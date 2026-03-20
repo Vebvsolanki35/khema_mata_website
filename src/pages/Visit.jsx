@@ -1,9 +1,38 @@
+import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
-import { WHATSAPP_NUMBER } from "../config/constants";
+import routes from "../data/routes";
+
+const CITIES = [
+  { name: "Delhi", nameHi: "दिल्ली", coords: [28.6139, 77.2090] },
+  { name: "Mumbai", nameHi: "मुंबई", coords: [19.0760, 72.8777] },
+  { name: "Jaipur", nameHi: "जयपुर", coords: [26.9124, 75.7873] },
+  { name: "Ahmedabad", nameHi: "अहमदाबाद", coords: [23.0225, 72.5714] },
+  { name: "Surat", nameHi: "सूरत", coords: [21.1702, 72.8311] },
+  { name: "Udaipur", nameHi: "उदयपुर", coords: [24.5854, 73.7125] },
+  { name: "Kota", nameHi: "कोटा", coords: [25.2138, 75.8648] },
+  { name: "Jodhpur", nameHi: "जोधपुर", coords: [26.2389, 73.0243] },
+  { name: "Bhopal", nameHi: "भोपाल", coords: [23.2599, 77.4126] },
+];
 
 function Visit() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const v = t.visit;
+  const [selectedCity, setSelectedCity] = useState("");
+
+  const selectedRoute = routes.find((r) => {
+    if (!selectedCity) return false;
+    return (
+      r.fromEn === selectedCity ||
+      r.from === CITIES.find((c) => c.name === selectedCity)?.nameHi
+    );
+  });
+
+  const getRouteLabel = (route) => {
+    if (!route) return null;
+    if (language === "en") return { from: route.fromEn, desc: route.descEn };
+    if (language === "gu") return { from: route.fromGu, desc: route.descGu };
+    return { from: route.from, desc: route.desc };
+  };
 
   return (
     <main>
@@ -22,6 +51,76 @@ function Visit() {
         <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
           {v.subtitle}
         </p>
+      </section>
+
+      {/* Trip Planner */}
+      <section className="py-12 px-4 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="section-title text-2xl font-bold">
+            🗓️ {language === "en" ? "Trip Planner" : language === "gu" ? "યાત્રા આયોજનકાર" : "यात्रा योजनाकार"}
+          </h2>
+          <div className="mt-8">
+            <label
+              className="block text-sm font-semibold mb-2"
+              style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+            >
+              {language === "en" ? "Select your departure city:" : language === "gu" ? "તમારું શહેર પસંદ કરો:" : "अपना शहर चुनें:"}
+            </label>
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="w-full md:w-auto border-2 rounded-xl px-4 py-2 text-base font-medium focus:outline-none"
+              style={{ borderColor: "var(--gold)", color: "var(--maroon)" }}
+            >
+              <option value="">
+                {language === "en" ? "-- Choose City --" : language === "gu" ? "-- શહેર પસંદ કરો --" : "-- शहर चुनें --"}
+              </option>
+              {CITIES.map((city) => (
+                <option key={city.name} value={city.name}>
+                  {language === "hi" ? city.nameHi : city.name}
+                </option>
+              ))}
+            </select>
+
+            {selectedCity && (
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl overflow-hidden shadow-lg" style={{ border: "2px solid var(--gold)" }}>
+                  <iframe
+                    title={`Route from ${selectedCity}`}
+                    src={`https://maps.google.com/maps?saddr=${encodeURIComponent(selectedCity + ", India")}&daddr=Dei,Bundi,Rajasthan+323802&output=embed`}
+                    width="100%"
+                    height="400"
+                    style={{ border: 0, display: "block" }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+                {selectedRoute && (() => {
+                  const label = getRouteLabel(selectedRoute);
+                  return (
+                    <div
+                      className="rounded-2xl p-5"
+                      style={{ backgroundColor: "var(--cream)", borderLeft: "4px solid var(--saffron)" }}
+                    >
+                      <div className="flex gap-6 mb-2">
+                        <span className="text-sm font-semibold" style={{ color: "var(--saffron)" }}>
+                          📏 {selectedRoute.distance}
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: "var(--maroon)" }}>
+                          ⏱️ {selectedRoute.time}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 text-sm leading-relaxed" style={{ fontFamily: "'Tiro Devanagari Hindi', serif" }}>
+                        🚗 {label.desc}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Three Temple Locations */}
