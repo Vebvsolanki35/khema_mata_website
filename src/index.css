@@ -22,7 +22,7 @@ body {
 }
 .ticker-text {
   display: inline-block;
-  animation: ticker-scroll 30s linear infinite;
+  animation: ticker-scroll 80s linear infinite;
   white-space: nowrap;
 }
 

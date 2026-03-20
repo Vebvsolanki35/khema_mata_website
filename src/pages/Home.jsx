@@ -6,10 +6,10 @@ import Testimonials from "../components/Testimonials";
 const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1920";
 
 const PHOTO_STRIP = [
-  "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=400",
-  "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400",
-  "https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?w=400",
-  "https://images.unsplash.com/photo-1609766418204-94aae0ecfdfc?w=400",
+  "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600",
+  "https://images.unsplash.com/photo-1477587458883-47145ed6a800?w=600",
+  "https://images.unsplash.com/photo-1548013146-72479768bada?w=600",
+  "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?w=600",
 ];
 
 function AnimatedStat({ value, label }) {
