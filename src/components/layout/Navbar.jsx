@@ -22,6 +22,7 @@ function Navbar() {
     { to: "/facilities", label: t.nav.facilities },
     { to: "/gallery", label: t.nav.gallery },
     { to: "/contact", label: t.nav.contact },
+    { to: "/planner", label: t.nav.planner },
   ];
 
   const LANGS = [
