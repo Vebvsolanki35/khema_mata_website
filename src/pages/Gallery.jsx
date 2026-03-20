@@ -2,18 +2,18 @@ import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
 
 const IMAGES = [
-  { src: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=400", alt: "Temple View 1" },
-  { src: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400", alt: "Temple View 2" },
-  { src: "https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?w=400", alt: "Temple View 3" },
-  { src: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=400", alt: "Temple View 4" },
-  { src: "https://images.unsplash.com/photo-1609766418204-94aae0ecfdfc?w=400", alt: "Temple View 5" },
-  { src: "https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=400", alt: "Temple View 6" },
-  { src: "https://picsum.photos/400/300?random=7", alt: "Temple View 7" },
-  { src: "https://picsum.photos/400/500?random=8", alt: "Temple View 8" },
-  { src: "https://picsum.photos/400/280?random=9", alt: "Temple View 9" },
-  { src: "https://picsum.photos/400/350?random=10", alt: "Temple View 10" },
-  { src: "https://picsum.photos/400/450?random=11", alt: "Temple View 11" },
-  { src: "https://picsum.photos/400/300?random=12", alt: "Temple View 12" },
+  { src: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", alt: "राजस्थान मंदिर" },
+  { src: "https://images.unsplash.com/photo-1477587458883-47145ed6a800?w=600", alt: "राजस्थान किला" },
+  { src: "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=600", alt: "चित्तौड़गढ़" },
+  { src: "https://images.unsplash.com/photo-1548013146-72479768bada?w=600", alt: "आमेर किला" },
+  { src: "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?w=600", alt: "राजस्थान संस्कृति" },
+  { src: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=600", alt: "जयपुर" },
+  { src: "https://images.unsplash.com/photo-1568454537842-d933259bb258?w=600", alt: "माँ दुर्गा" },
+  { src: "https://images.unsplash.com/photo-1609766418204-94aae0ecfdfc?w=600", alt: "मंदिर घंटी" },
+  { src: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=600", alt: "मंदिर प्रांगण" },
+  { src: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600", alt: "मंदिर द्वार" },
+  { src: "https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=600", alt: "नवरात्रि उत्सव" },
+  { src: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=600", alt: "माँ की आरती" },
 ];
 
 function Gallery() {
@@ -93,7 +93,7 @@ function Gallery() {
             <img
               src={
                 new URL(selected.src).hostname === "images.unsplash.com"
-                  ? selected.src.replace("w=400", "w=1200")
+                  ? selected.src.replace("w=600", "w=1200")
                   : selected.src
               }
               alt={selected.alt}
