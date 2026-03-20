@@ -14,6 +14,7 @@ import Gallery from "./pages/Gallery";
 import Contact from "./pages/Contact";
 import Admin from "./pages/Admin";
 import Planner from "./pages/Planner";
+import Calendar from "./pages/Calendar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/planner" element={<Planner />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/admin/login" element={<Admin />} />
         <Route
           path="/admin"

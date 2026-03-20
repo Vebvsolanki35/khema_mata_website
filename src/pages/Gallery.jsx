@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLanguage } from "../context/LanguageContext";
+import { useLanguage } from "../context/useLanguage";
 
 const IMAGES = [
   { src: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", alt: "राजस्थान मंदिर" },

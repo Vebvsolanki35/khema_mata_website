@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLanguage } from "../context/LanguageContext";
+import { useLanguage } from "../context/useLanguage";
 import { useContactForm } from "../hooks/useContactForm";
 import { WHATSAPP_NUMBER } from "../config/constants";
 
