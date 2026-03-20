@@ -1,1 +1,0 @@
-mkdir -p src/pages && touch src/pages/Home.jsx src/pages/Temple.jsx src/pages/Visit.jsx src/pages/Gallery.jsx src/pages/Contact.jsx
