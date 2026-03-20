@@ -7,6 +7,8 @@ import Temple from "./pages/Temple";
 import Visit from "./pages/Visit";
 import Gallery from "./pages/Gallery";
 import Contact from "./pages/Contact";
+import Admin from "./pages/Admin";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
@@ -19,6 +21,15 @@ function App() {
         <Route path="/visit" element={<Visit />} />
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/admin/login" element={<Admin />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </LanguageProvider>
   );

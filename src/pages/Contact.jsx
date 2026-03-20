@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
+import { useContactForm } from "../hooks/useContactForm";
 
 const WHATSAPP_NUMBER = "919001234567";
 const UPI_ID = "khemajmata@upi";
@@ -10,17 +11,21 @@ function Contact() {
 
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [copied, setCopied] = useState(false);
+  const { submit, loading, success, error } = useContactForm();
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const msg = encodeURIComponent(
-      `${c.nameLabel}: ${form.name}\n${c.phoneLabel}: ${form.phone}\n${c.messageLabel}: ${form.message}`
-    );
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
+    const ok = await submit(form);
+    if (ok) {
+      const msg = encodeURIComponent(
+        `${c.nameLabel}: ${form.name}\n${c.phoneLabel}: ${form.phone}\n${c.messageLabel}: ${form.message}`
+      );
+      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
+    }
   };
 
   const handleCopy = () => {
@@ -89,10 +94,23 @@ function Contact() {
         </div>
         <button
           type="submit"
-          className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+          disabled={loading}
+          className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
         >
-          💬 {c.submit}
+          {loading ? (
+            <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>💬 {c.submit}</>
+          )}
         </button>
+        {success && (
+          <p className="text-green-600 text-sm text-center font-medium">
+            ✅ Message saved successfully!
+          </p>
+        )}
+        {error && (
+          <p className="text-red-500 text-sm text-center">{error}</p>
+        )}
       </form>
 
       {/* Donation Section */}
