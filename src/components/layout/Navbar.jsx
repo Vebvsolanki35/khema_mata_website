@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { WHATSAPP_NUMBER } from "../../config/constants";
+import Ticker from "./Ticker";
 
 function Navbar() {
   const { language, setLanguage, t } = useLanguage();
@@ -32,7 +33,9 @@ function Navbar() {
   ];
 
   return (
-    <nav
+    <>
+      <Ticker />
+      <nav
       className="sticky-nav shadow-md"
       style={{ backgroundColor: "rgba(139,26,26,0.97)", borderBottom: "2px solid var(--gold)" }}
     >
@@ -196,6 +199,7 @@ function Navbar() {
         </div>
       )}
     </nav>
+    </>
   );
 }
 

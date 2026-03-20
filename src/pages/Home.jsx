@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 
-const HERO_IMG = "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=1920";
+const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1920";
 
 const PHOTO_STRIP = [
   "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=400",
