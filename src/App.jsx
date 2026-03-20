@@ -1,5 +1,6 @@
 import Navbar from "./components/layout/Navbar";
 import { Routes, Route } from "react-router-dom";
+import { LanguageProvider } from "./context/LanguageContext";
 
 import Home from "./pages/Home";
 import Temple from "./pages/Temple";
@@ -9,7 +10,7 @@ import Contact from "./pages/Contact";
 
 function App() {
   return (
-    <>
+    <LanguageProvider>
       <Navbar />
 
       <Routes>
@@ -19,7 +20,7 @@ function App() {
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/contact" element={<Contact />} />
       </Routes>
-    </>
+    </LanguageProvider>
   );
 }
 
