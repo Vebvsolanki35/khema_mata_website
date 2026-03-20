@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
+import Testimonials from "../components/Testimonials";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1920";
 
@@ -107,6 +108,31 @@ function Home() {
         </div>
       </section>
 
+      {/* Quick Stats Bar */}
+      <section
+        className="py-4 px-4"
+        style={{ backgroundColor: "var(--maroon)" }}
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-yellow-600/40">
+            {[
+              "१०८०+ वर्ष पुराना मंदिर",
+              "सोलंकी वंश की कुलदेवी",
+              "देई, बूंदी, राजस्थान",
+              "निःशुल्क दर्शन",
+            ].map((stat) => (
+              <div
+                key={stat}
+                className="text-center py-3 px-4 text-sm md:text-base font-semibold"
+                style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+              >
+                {stat}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Animated Stats */}
       <section
         ref={statsRef}
@@ -181,6 +207,9 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* Testimonials */}
+      <Testimonials />
 
       {/* Photo Strip */}
       <section className="py-8 px-4" style={{ backgroundColor: "var(--maroon)" }}>
