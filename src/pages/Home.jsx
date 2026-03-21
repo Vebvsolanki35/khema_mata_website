@@ -7,9 +7,9 @@ const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w
 
 const PHOTO_STRIP = [
   "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600",
-  "https://images.unsplash.com/photo-1477587458883-47145ed6a800?w=600",
+  "https://images.unsplash.com/photo-1568454537842-d933259bb258?w=600",
   "https://images.unsplash.com/photo-1548013146-72479768bada?w=600",
-  "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?w=600",
+  "https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=600",
 ];
 
 function AnimatedStat({ value, label }) {

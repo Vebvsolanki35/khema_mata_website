@@ -72,7 +72,16 @@ The dashboard shows:
 - All contact form submissions
 - All donations with a running total
 
-## Deploy to Vercel
+## Supabase Storage Setup
+
+Run this SQL in Supabase SQL Editor to enable gallery uploads:
+
+```sql
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'gallery');
+CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'gallery');
+```
+
+
 
 1. Push your code to GitHub.
 2. Import the repository on [vercel.com](https://vercel.com).
