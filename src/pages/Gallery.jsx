@@ -1,24 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "../context/useLanguage";
+import { supabase } from "../lib/supabase";
 
-const IMAGES = [
-  { src: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", alt: "राजस्थान मंदिर" },
-  { src: "https://images.unsplash.com/photo-1477587458883-47145ed6a800?w=600", alt: "राजस्थान किला" },
-  { src: "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=600", alt: "चित्तौड़गढ़" },
-  { src: "https://images.unsplash.com/photo-1548013146-72479768bada?w=600", alt: "आमेर किला" },
-  { src: "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?w=600", alt: "राजस्थान संस्कृति" },
-  { src: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=600", alt: "जयपुर" },
-  { src: "https://images.unsplash.com/photo-1568454537842-d933259bb258?w=600", alt: "माँ दुर्गा" },
-  { src: "https://images.unsplash.com/photo-1609766418204-94aae0ecfdfc?w=600", alt: "मंदिर घंटी" },
-  { src: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=600", alt: "मंदिर प्रांगण" },
-  { src: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600", alt: "मंदिर द्वार" },
-  { src: "https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=600", alt: "नवरात्रि उत्सव" },
-  { src: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=600", alt: "माँ की आरती" },
+const DEFAULT_IMAGES = [
+  { url: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", title: "राजस्थान मंदिर" },
+  { url: "https://images.unsplash.com/photo-1477587458883-47145ed6a800?w=600", title: "राजस्थान किला" },
+  { url: "https://images.unsplash.com/photo-1548013146-72479768bada?w=600", title: "आमेर किला जयपुर" },
+  { url: "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?w=600", title: "राजस्थान संस्कृति" },
+  { url: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=600", title: "मंदिर प्रांगण" },
+  { url: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600", title: "मंदिर द्वार" },
+  { url: "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=600", title: "माँ की आरती" },
+  { url: "https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=600", title: "नवरात्रि उत्सव" },
+  { url: "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=600", title: "चित्तौड़गढ़ किला" },
+  { url: "https://images.unsplash.com/photo-1568454537842-d933259bb258?w=600", title: "माँ भवानी" },
+  { url: "https://images.unsplash.com/photo-1609766418204-94aae0ecfdfc?w=600", title: "मंदिर घंटी" },
+  { url: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=600", title: "जयपुर हवा महल" },
 ];
 
 function Gallery() {
   const { t } = useLanguage();
   const [selected, setSelected] = useState(null);
+  const [dbImages, setDbImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  useEffect(() => {
+    supabase
+      .from("gallery_images")
+      .select("url, title")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) setDbImages(data);
+      });
+  }, []);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const fileName = `${Date.now()}_${file.name}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("gallery")
+        .upload(fileName, file);
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("gallery").getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
+      const { error: insertErr } = await supabase
+        .from("gallery_images")
+        .insert({ url: publicUrl, title: fileName });
+      if (insertErr) throw insertErr;
+      setDbImages((prev) => [{ url: publicUrl, title: fileName }, ...prev]);
+    } catch (err) {
+      setUploadError(err.message || "Upload failed");
+    }
+    setUploading(false);
+  };
+
+  const allImages = [...dbImages, ...DEFAULT_IMAGES];
 
   return (
     <main>
@@ -39,20 +79,29 @@ function Gallery() {
       {/* Gallery Grid */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
         <div className="max-w-6xl mx-auto">
-          {/* Upload placeholder */}
+          {/* Upload */}
           <div className="text-center mb-8">
-            <button
-              className="px-6 py-2 rounded-full font-semibold text-sm transition-colors"
+            <label
+              className="px-6 py-2 rounded-full font-semibold text-sm transition-colors cursor-pointer inline-block"
               style={{ backgroundColor: "var(--maroon)", color: "var(--gold)", border: "1px solid var(--gold)" }}
-              onClick={() => alert("Upload feature coming soon!")}
             >
-              📤 {t.gallery.upload}
-            </button>
+              {uploading ? "⏳ अपलोड हो रहा है…" : `📤 ${t.gallery.upload}`}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+            {uploadError && (
+              <p className="text-red-500 text-sm mt-2">{uploadError}</p>
+            )}
           </div>
 
           {/* Masonry Grid */}
           <div className="masonry-grid">
-            {IMAGES.map((img, idx) => (
+            {allImages.map((img, idx) => (
               <div
                 key={idx}
                 className="masonry-item"
@@ -62,8 +111,8 @@ function Gallery() {
                 onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
               >
                 <img
-                  src={img.src}
-                  alt={img.alt}
+                  src={img.url}
+                  alt={img.title}
                   loading="lazy"
                 />
               </div>
@@ -92,16 +141,16 @@ function Gallery() {
             </button>
             <img
               src={
-                new URL(selected.src).hostname === "images.unsplash.com"
-                  ? selected.src.replace("w=600", "w=1200")
-                  : selected.src
+                new URL(selected.url).hostname === "images.unsplash.com"
+                  ? selected.url.replace("w=600", "w=1200")
+                  : selected.url
               }
-              alt={selected.alt}
+              alt={selected.title}
               className="w-full rounded-2xl shadow-2xl"
               style={{ maxHeight: "80vh", objectFit: "contain" }}
             />
             <p className="text-center mt-3 text-sm opacity-80" style={{ color: "#FFF8F0" }}>
-              {selected.alt}
+              {selected.title}
             </p>
           </div>
         </div>

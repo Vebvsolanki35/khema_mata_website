@@ -2,28 +2,17 @@ import { useState } from "react";
 import { useLanguage } from "../context/useLanguage";
 import routes from "../data/routes";
 
-const CITIES = [
-  { name: "Delhi", nameHi: "दिल्ली", coords: [28.6139, 77.2090] },
-  { name: "Mumbai", nameHi: "मुंबई", coords: [19.0760, 72.8777] },
-  { name: "Jaipur", nameHi: "जयपुर", coords: [26.9124, 75.7873] },
-  { name: "Ahmedabad", nameHi: "अहमदाबाद", coords: [23.0225, 72.5714] },
-  { name: "Surat", nameHi: "सूरत", coords: [21.1702, 72.8311] },
-  { name: "Udaipur", nameHi: "उदयपुर", coords: [24.5854, 73.7125] },
-  { name: "Kota", nameHi: "कोटा", coords: [25.2138, 75.8648] },
-  { name: "Jodhpur", nameHi: "जोधपुर", coords: [26.2389, 73.0243] },
-  { name: "Bhopal", nameHi: "भोपाल", coords: [23.2599, 77.4126] },
-];
-
 function Visit() {
   const { t, language } = useLanguage();
   const v = t.visit;
-  const [selectedCity, setSelectedCity] = useState("");
+  const [inputCity, setInputCity] = useState("");
+  const [showDirections, setShowDirections] = useState(false);
 
   const selectedRoute = routes.find((r) => {
-    if (!selectedCity) return false;
+    if (!inputCity) return false;
     return (
-      r.fromEn === selectedCity ||
-      r.from === CITIES.find((c) => c.name === selectedCity)?.nameHi
+      r.fromEn?.toLowerCase() === inputCity.toLowerCase() ||
+      r.from === inputCity
     );
   });
 
@@ -64,30 +53,34 @@ function Visit() {
               className="block text-sm font-semibold mb-2"
               style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
             >
-              {language === "en" ? "Select your departure city:" : language === "gu" ? "તમારું શહેર પસંદ કરો:" : "अपना शहर चुनें:"}
+              {language === "en" ? "Enter your departure city:" : language === "gu" ? "તમારું શહેર લખો:" : "अपना शहर लिखें:"}
             </label>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full md:w-auto border-2 rounded-xl px-4 py-2 text-base font-medium focus:outline-none"
-              style={{ borderColor: "var(--gold)", color: "var(--maroon)" }}
-            >
-              <option value="">
-                {language === "en" ? "-- Choose City --" : language === "gu" ? "-- શહેર પસંદ કરો --" : "-- शहर चुनें --"}
-              </option>
-              {CITIES.map((city) => (
-                <option key={city.name} value={city.name}>
-                  {language === "hi" ? city.nameHi : city.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                type="text"
+                value={inputCity}
+                onChange={(e) => { setInputCity(e.target.value); setShowDirections(false); }}
+                placeholder={language === "en" ? "e.g. Jaipur" : language === "gu" ? "દા.ત. જયપુર" : "जैसे जयपुर"}
+                className="flex-1 md:flex-none md:w-64 border-2 rounded-xl px-4 py-2 text-base font-medium focus:outline-none"
+                style={{ borderColor: "var(--gold)", color: "var(--maroon)" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowDirections(true)}
+                disabled={!inputCity.trim()}
+                className="px-5 py-2 rounded-xl font-bold text-sm transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "var(--saffron)", color: "white" }}
+              >
+                {language === "en" ? "Get Directions" : language === "gu" ? "દિશા જુઓ" : "दिशा दिखाएं"}
+              </button>
+            </div>
 
-            {selectedCity && (
+            {showDirections && inputCity && (
               <div className="mt-6 space-y-4">
                 <div className="rounded-2xl overflow-hidden shadow-lg" style={{ border: "2px solid var(--gold)" }}>
                   <iframe
-                    title={`Route from ${selectedCity}`}
-                    src={`https://maps.google.com/maps?saddr=${encodeURIComponent(selectedCity + ", India")}&daddr=Dei,Bundi,Rajasthan+323802&output=embed`}
+                    title={`Route from ${inputCity}`}
+                    src={`https://maps.google.com/maps?saddr=${encodeURIComponent(inputCity + ", India")}&daddr=Dei,Bundi,Rajasthan+323802&output=embed`}
                     width="100%"
                     height="400"
                     style={{ border: 0, display: "block" }}

@@ -1,11 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "../context/useLanguage";
 import { useContactForm } from "../hooks/useContactForm";
 import { WHATSAPP_NUMBER } from "../config/constants";
+import { supabase } from "../lib/supabase";
+
+const DEFAULT_WA_GROUPS = [
+  { name: "मंदिर अपडेट ग्रुप", link: "https://chat.whatsapp.com/temple" },
+  { name: "सोलंकी कुल समूह", link: "https://chat.whatsapp.com/solanki" },
+  { name: "तीर्थ यात्रा ग्रुप", link: "https://chat.whatsapp.com/tirtha" },
+  { name: "नवरात्रि ग्रुप", link: "https://chat.whatsapp.com/navratri" },
+];
 
 function Contact() {
   const { t } = useLanguage();
   const c = t.contact;
+  const [waGroups, setWaGroups] = useState(DEFAULT_WA_GROUPS);
+
+  useEffect(() => {
+    supabase
+      .from("whatsapp_groups")
+      .select("name, link")
+      .limit(4)
+      .then(({ data }) => {
+        if (data && data.length > 0) setWaGroups(data);
+      });
+  }, []);
 
   const [form, setForm] = useState({
     name: "",
@@ -221,7 +240,7 @@ function Contact() {
               💬 WhatsApp Groups
             </h3>
             <div className="space-y-3">
-              {c.whatsappGroups.map((grp, i) => (
+              {waGroups.map((grp, i) => (
                 <a
                   key={i}
                   href={grp.link}

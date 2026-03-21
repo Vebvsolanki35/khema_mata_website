@@ -228,59 +228,84 @@ function TabAnnouncements() {
   );
 }
 
+const WA_GROUPS = [
+  { key: "temple_update", label: "🛕 मंदिर अपडेट ग्रुप" },
+  { key: "solanki_kul", label: "👥 सोलंकी कुल समूह" },
+  { key: "tirtha_yatra", label: "🚗 तीर्थ यात्रा ग्रुप" },
+  { key: "navratri", label: "🎉 नवरात्रि ग्रुप" },
+];
+
 function TabWhatsApp() {
-  const [list, setList] = useState([]);
-  const [name, setName] = useState("");
-  const [link, setLink] = useState("");
+  const [links, setLinks] = useState({
+    temple_update: "",
+    solanki_kul: "",
+    tirtha_yatra: "",
+    navratri: "",
+  });
   const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
   const [error, setError] = useState(null);
 
-  const fetchList = () => {
-    supabase.from("whatsapp_groups").select("*").order("created_at", { ascending: false })
-      .then(({ data }) => setList(data || []));
-  };
+  useEffect(() => {
+    supabase
+      .from("whatsapp_groups")
+      .select("key, link")
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setLinks((prev) => {
+            const updated = { ...prev };
+            data.forEach((row) => {
+              if (row.key in updated) updated[row.key] = row.link || "";
+            });
+            return updated;
+          });
+        }
+      });
+  }, []);
 
-  useEffect(fetchList, []);
-
-  const handleAdd = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const { error: err } = await supabase.from("whatsapp_groups").insert({ name, link });
+    setMsg(null);
+    const upserts = WA_GROUPS.map((g) => ({
+      key: g.key,
+      name: g.label,
+      link: links[g.key],
+    }));
+    const { error: err } = await supabase
+      .from("whatsapp_groups")
+      .upsert(upserts, { onConflict: "key" });
     setSaving(false);
     if (err) { setError(err.message); return; }
-    setName(""); setLink("");
-    fetchList();
-  };
-
-  const handleDelete = async (id) => {
-    await supabase.from("whatsapp_groups").delete().eq("id", id);
-    fetchList();
+    setMsg("✅ सहेजा गया!");
+    setTimeout(() => setMsg(null), 3000);
   };
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleAdd} className="bg-orange-50 rounded-xl p-4 space-y-3 border border-orange-100">
-        <h3 className="font-bold text-orange-700">नया WhatsApp ग्रुप जोड़ें</h3>
-        <input required value={name} onChange={e => setName(e.target.value)} placeholder="ग्रुप का नाम" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-        <input required value={link} onChange={e => setLink(e.target.value)} placeholder="invite link (https://chat.whatsapp.com/…)" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        <button type="submit" disabled={saving} className="bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-xl text-sm transition-colors">
-          {saving ? "सहेज रहे हैं…" : "जोड़ें"}
-        </button>
-      </form>
-      <div className="space-y-2">
-        {list.length === 0 ? <p className="text-gray-400 text-sm">कोई ग्रुप नहीं।</p> : list.map(item => (
-          <div key={item.id} className="flex justify-between items-center bg-white rounded-xl p-3 shadow-sm border border-orange-100">
-            <div>
-              <p className="font-semibold text-sm text-green-700">{item.name}</p>
-              <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 truncate block max-w-xs">{item.link}</a>
-            </div>
-            <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-600 text-xs ml-2 shrink-0">हटाएं</button>
-          </div>
-        ))}
-      </div>
-    </div>
+    <form onSubmit={handleSave} className="bg-orange-50 rounded-xl p-5 space-y-4 border border-orange-100 max-w-lg">
+      <h3 className="font-bold text-orange-700">WhatsApp ग्रुप लिंक</h3>
+      {WA_GROUPS.map((g) => (
+        <div key={g.key}>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{g.label}</label>
+          <input
+            value={links[g.key]}
+            onChange={(e) => setLinks((prev) => ({ ...prev, [g.key]: e.target.value }))}
+            placeholder="https://chat.whatsapp.com/…"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+        </div>
+      ))}
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {msg && <p className="text-green-600 text-sm font-semibold">{msg}</p>}
+      <button
+        type="submit"
+        disabled={saving}
+        className="bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-xl text-sm transition-colors"
+      >
+        {saving ? "सहेज रहे हैं…" : "सभी सेव करें"}
+      </button>
+    </form>
   );
 }
 
