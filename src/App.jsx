@@ -1,9 +1,9 @@
+import { useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
 import Ticker from "./components/layout/Ticker";
 import FloatingButtons from "./components/layout/FloatingButtons";
-import { Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
-
 import Home from "./pages/Home";
 import Temple from "./pages/Temple";
 import History from "./pages/History";
@@ -17,9 +17,21 @@ import Planner from "./pages/Planner";
 import Calendar from "./pages/Calendar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <LanguageProvider>
+      <ScrollToTop />
       <Ticker />
       <Navbar />
       <FloatingButtons />
