@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
+import SectionNav from "./components/layout/SectionNav";
 import Ticker from "./components/layout/Ticker";
 import Footer from "./components/layout/Footer";
 import FloatingButtons from "./components/layout/FloatingButtons";
@@ -12,6 +13,7 @@ import Visit from "./pages/Visit";
 import Donation from "./pages/Donation";
 import Facilities from "./pages/Facilities";
 import Gallery from "./pages/Gallery";
+import Darshan from "./pages/Darshan";
 import Contact from "./pages/Contact";
 import Admin from "./pages/Admin";
 import Planner from "./pages/Planner";
@@ -41,12 +43,15 @@ function App() {
       <ScrollToTop />
       {!isAdmin && <Ticker />}
       {!isAdmin && <Navbar />}
+      {/* Sub-pages of the active five-tab section stay one tap away. */}
+      {!isAdmin && <SectionNav />}
       {!isAdmin && <FloatingButtons />}
 
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/temple" element={<Temple />} />
         <Route path="/history" element={<History />} />
+        <Route path="/darshan" element={<Darshan />} />
         <Route path="/visit" element={<Visit />} />
         <Route path="/donation" element={<Donation />} />
         <Route path="/facilities" element={<Facilities />} />

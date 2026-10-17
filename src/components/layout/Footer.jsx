@@ -1,18 +1,8 @@
 import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/useLanguage";
 import { WHATSAPP_GROUP_INVITE } from "../../config/constants";
+import { SECTIONS } from "../../data/navigation";
 import WhatsAppButton from "../WhatsAppButton";
-
-const QUICK_LINKS = [
-  { to: "/temple", key: "temple" },
-  { to: "/history", key: "history" },
-  { to: "/visit", key: "visit" },
-  { to: "/donation", key: "donation" },
-  { to: "/facilities", key: "facilities" },
-  { to: "/gallery", key: "gallery" },
-  { to: "/trust", key: "trust" },
-  { to: "/contact", key: "contact" },
-];
 
 function Footer() {
   const { t } = useLanguage();
@@ -54,24 +44,42 @@ function Footer() {
           </ul>
         </div>
 
-        {/* Quick links */}
-        <nav aria-label={f.quickLinks}>
+        {/* All pages, grouped by the four primary sections.
+            Built from the same SECTIONS config as the header, so a page can
+            never disappear from the footer just because it is no longer a tab. */}
+        <nav aria-label={f.quickLinks} className="lg:col-span-2">
           <h3 className="font-bold text-sm mb-2" style={{ color: "var(--gold)" }}>
             🔗 {f.quickLinks}
           </h3>
-          <ul className="text-sm grid grid-cols-2 gap-x-3 gap-y-1">
-            {QUICK_LINKS.map((l) => (
-              <li key={l.to}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {SECTIONS.map((section) => (
+              <div key={section.id}>
                 <Link
-                  to={l.to}
-                  className="transition-opacity hover:opacity-70"
-                  style={{ color: "#FFF8F0" }}
+                  to={section.to}
+                  className="font-bold text-[13px] block mb-1.5"
+                  style={{ color: "var(--gold)" }}
                 >
-                  {t.nav[l.key]}
+                  {section.icon} {t.nav[section.labelKey]}
                 </Link>
-              </li>
+                <ul className="text-[13px] space-y-1">
+                  {(section.children.length
+                    ? section.children
+                    : [{ to: section.to, labelKey: section.labelKey }]
+                  ).map((child) => (
+                    <li key={child.to}>
+                      <Link
+                        to={child.to}
+                        className="transition-opacity hover:opacity-70"
+                        style={{ color: "#FFF8F0" }}
+                      >
+                        {t.nav[child.labelKey]}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </nav>
 
         {/* Connect */}
