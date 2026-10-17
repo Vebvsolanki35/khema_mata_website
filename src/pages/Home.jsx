@@ -36,7 +36,7 @@ function AnimatedStat({ value, label }) {
  * Hero + introduction, today's darshan/aarti, festivals & notices, a short row
  * of quick-action buttons and one donation call-to-action. There is no
  * directory of the site's pages here; navigation lives in the five-tab header,
- * the SectionNav bar and the footer.
+ * their parent section page and the footer.
  */
 function Home() {
   const { t } = useLanguage();

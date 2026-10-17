@@ -63,28 +63,45 @@ const BOTTOM_SECTION = `सोलंकी वंश की महान वि�
 
 सोलंकी वंश का इतिहास हमें यह सिखाता है कि शक्ति और भक्ति का संयोग ही सच्ची महानता है। माँ खेमज माता के आशीर्वाद से यह वंश आज भी फलता-फूलता है और अपनी गौरवशाली परंपराओं को जीवित रखे हुए है। जय माँ खेमज! जय सोलंकी वंश!`;
 
-function History() {
+/** Hero banner. Rendered above the History content.
+ *  Kept separate so the parent page can inline the body only.
+ */
+function HistoryHero() {
   const { t } = useLanguage();
   const hp = t.historyPage;
 
   return (
-    <main>
-      {/* Hero */}
-      <section
-        className="py-20 px-4 text-center"
-        style={{ background: "linear-gradient(135deg, var(--maroon) 0%, #5A0E0E 100%)" }}
+    <section
+      className="py-20 px-4 text-center"
+      style={{ background: "linear-gradient(135deg, var(--maroon) 0%, #5A0E0E 100%)" }}
+    >
+      <div className="text-5xl mb-4">👑</div>
+      <h1
+        className="text-3xl md:text-5xl font-bold mb-3"
+        style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
       >
-        <div className="text-5xl mb-4">👑</div>
-        <h1
-          className="text-3xl md:text-5xl font-bold mb-3"
-          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-        >
-          {hp.title}
-        </h1>
-        <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
-          {hp.subtitle}
-        </p>
-      </section>
+        {hp.title}
+      </h1>
+      <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
+        {hp.subtitle}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * All History content below the hero.
+ *
+ * Exported so Virasat (/temple) can render it inline as one continuous page.
+ * Nothing is removed: the /history route still renders exactly this
+ * content, unchanged and fully functional.
+ */
+export function HistoryContent() {
+  const { t } = useLanguage();
+  const hp = t.historyPage;
+
+  return (
+    <>
 
       {/* Top Section - Solanki Dynasty Overview */}
       <section className="py-12 px-4" style={{ backgroundColor: "#FFF0E0" }}>
@@ -219,8 +236,15 @@ function History() {
           </div>
         </div>
       </section>
-    </main>
+    </>
   );
 }
 
-export default History;
+export default function History() {
+  return (
+    <main>
+      <HistoryHero />
+      <HistoryContent />
+    </main>
+  );
+}

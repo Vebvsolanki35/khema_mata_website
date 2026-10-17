@@ -16,7 +16,8 @@ const LANGS = [
  * There is deliberately NO hamburger menu: on desktop the five tabs sit in the
  * compact header row, and on mobile they appear as a horizontally scrollable
  * row underneath it. Sub-pages (History, Gallery, Panchang, Planner, Trust…)
- * are reached through the SectionNav bar and the footer — every original URL
+ * are rendered inside their parent section page and linked from the footer —
+ * every original URL
  * still works.
  */
 function Navbar() {

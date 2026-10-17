@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
-import SectionNav from "./components/layout/SectionNav";
 import Ticker from "./components/layout/Ticker";
 import Footer from "./components/layout/Footer";
 import FloatingButtons from "./components/layout/FloatingButtons";
@@ -43,8 +42,6 @@ function App() {
       <ScrollToTop />
       {!isAdmin && <Ticker />}
       {!isAdmin && <Navbar />}
-      {/* Sub-pages of the active five-tab section stay one tap away. */}
-      {!isAdmin && <SectionNav />}
       {!isAdmin && <FloatingButtons />}
 
       <Routes>

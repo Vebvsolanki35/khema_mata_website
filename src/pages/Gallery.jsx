@@ -18,7 +18,36 @@ const DEFAULT_IMAGES = [
   { url: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=600", title: "जयपुर हवा महल" },
 ];
 
-function Gallery() {
+/** Hero banner. Rendered above the Gallery content.
+ *  Kept separate so the parent page can inline the body only.
+ */
+function GalleryHero() {
+  const { t } = useLanguage();
+
+  return (
+    <section
+      className="py-16 px-4 text-center"
+      style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
+    >
+      <div className="text-5xl mb-4">📷</div>
+      <h1
+        className="text-3xl md:text-4xl font-bold mb-2"
+        style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+      >
+        {t.gallery.title}
+      </h1>
+    </section>
+  );
+}
+
+/**
+ * All Gallery content below the hero.
+ *
+ * Exported so Virasat (/temple) can render it inline as one continuous page.
+ * Nothing is removed: the /gallery route still renders exactly this
+ * content, unchanged and fully functional.
+ */
+export function GalleryContent() {
   const { t } = useLanguage();
   const [selected, setSelected] = useState(null);
   const [dbImages, setDbImages] = useState([]);
@@ -75,20 +104,7 @@ function Gallery() {
   const allImages = [...(featured ? [featured] : []), ...dbImages, ...DEFAULT_IMAGES];
 
   return (
-    <main>
-      {/* Hero */}
-      <section
-        className="py-16 px-4 text-center"
-        style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
-      >
-        <div className="text-5xl mb-4">📷</div>
-        <h1
-          className="text-3xl md:text-4xl font-bold mb-2"
-          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-        >
-          {t.gallery.title}
-        </h1>
-      </section>
+    <>
 
       {/* Gallery Grid */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
@@ -187,8 +203,15 @@ function Gallery() {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }
 
-export default Gallery;
+export default function Gallery() {
+  return (
+    <main>
+      <GalleryHero />
+      <GalleryContent />
+    </main>
+  );
+}

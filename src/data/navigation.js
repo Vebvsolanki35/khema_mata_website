@@ -4,7 +4,8 @@
  * IMPORTANT — nothing here deletes a route. Every page that existed before the
  * refactor still has its own URL; pages that are no longer a *primary* tab are
  * listed under the section they belong to and reached through:
- *   1. the SectionNav bar rendered under the header,
+ *   1. their parent section page (Virasat/Darshan/Yatra), where the
+ *      sub-page's real component is rendered inline,
  *   2. the links in the page footer, and
  *   3. their original direct URL, which is unchanged.
  *

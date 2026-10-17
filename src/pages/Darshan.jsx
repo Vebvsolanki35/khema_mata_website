@@ -1,13 +1,19 @@
-import { Link } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import { FESTIVALS } from "../data/festivals";
+import { CalendarContent } from "./Calendar";
 
 /**
- * Hub for the "Darshan & Festivals" tab.
+ * The "Darshan" tab — one complete, vertically scrollable page.
  *
- * Groups content that already exists elsewhere on the site — it does not
- * duplicate it. The full Panchang calendar keeps its own page at /calendar,
- * which is linked from here and from the SectionNav bar.
+ * Everything a visitor needs for darshan is rendered here in order:
+ *   1. daily darshan timings
+ *   2. complete aarti schedule
+ *   3. the full, interactive Hindu Panchang (rendered via <CalendarContent/>)
+ *   4. festival calendar / upcoming festivals
+ *
+ * The Panchang is the real interactive component from /calendar — month
+ * navigation, tithi colour legend, date selection and the vrat modal all work
+ * exactly as before. /calendar still renders the same content standalone.
  */
 function Darshan() {
   const { t } = useLanguage();
@@ -42,7 +48,7 @@ function Darshan() {
         </p>
       </section>
 
-      {/* Darshan timings */}
+      {/* 1 — Daily darshan timings */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
           <h2 className="section-title text-2xl font-bold">⏰ {d.timingsTitle}</h2>
@@ -68,85 +74,80 @@ function Darshan() {
         </div>
       </section>
 
-      {/* Aarti schedule + festivals */}
+      {/* 2 — Complete aarti schedule */}
       <section className="py-12 px-4 bg-white">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Aarti */}
-          <div>
-            <h2 className="section-title text-xl md:text-2xl font-bold">
-              🪔 {d.aartiTitle}
-            </h2>
-            <div className="mt-8 rounded-2xl overflow-hidden shadow-md" style={{ border: "1px solid var(--gold)" }}>
-              {t.temple.aartis.map((a, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3 px-5 py-4"
-                  style={{
-                    backgroundColor: i % 2 === 0 ? "var(--cream)" : "#FFFFFF",
-                    borderBottom: "1px solid rgba(212,175,55,0.2)",
-                  }}
+        <div className="max-w-5xl mx-auto">
+          <h2 className="section-title text-xl md:text-2xl font-bold">🪔 {d.aartiTitle}</h2>
+          <div
+            className="mt-8 rounded-2xl overflow-hidden shadow-md"
+            style={{ border: "1px solid var(--gold)" }}
+          >
+            {t.temple.aartis.map((a, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-3 px-5 py-4"
+                style={{
+                  backgroundColor: i % 2 === 0 ? "var(--cream)" : "#FFFFFF",
+                  borderBottom: "1px solid rgba(212,175,55,0.2)",
+                }}
+              >
+                <span
+                  className="font-semibold"
+                  style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
                 >
-                  <span
-                    className="font-semibold"
-                    style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-                  >
-                    🔔 {a.name}
-                  </span>
-                  <span className="font-bold" style={{ color: "var(--saffron)" }}>
-                    {a.time}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Festivals */}
-          <div>
-            <h2 className="section-title text-xl md:text-2xl font-bold">
-              🎉 {d.festivalsTitle}
-            </h2>
-            <div className="mt-8 rounded-2xl overflow-hidden shadow-md" style={{ border: "1px solid var(--gold)" }}>
-              {festivals.map((f, i) => (
-                <div
-                  key={i}
-                  className="px-5 py-4"
-                  style={{
-                    backgroundColor: i % 2 === 0 ? "var(--cream)" : "#FFFFFF",
-                    borderBottom: "1px solid rgba(212,175,55,0.2)",
-                  }}
-                >
-                  <p
-                    className="font-bold"
-                    style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-                  >
-                    {f.name}
-                  </p>
-                  <p className="text-sm" style={{ color: "#6B5B4B" }}>
-                    {f.desc}
-                  </p>
-                </div>
-              ))}
-            </div>
+                  🔔 {a.name}
+                </span>
+                <span className="font-bold" style={{ color: "var(--saffron)" }}>
+                  {a.time}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Panchang teaser -> full calendar */}
-      <section className="py-12 px-4" style={{ backgroundColor: "var(--maroon)" }}>
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: "var(--gold)" }}>
-            📅 {d.panchangTitle}
-          </h2>
-          <p className="mb-7 text-sm md:text-base" style={{ color: "#FFF8F0" }}>
+      {/* 3 — Hindu Panchang (full, interactive) */}
+      <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
+        <div className="max-w-5xl mx-auto">
+          <h2 className="section-title text-xl md:text-2xl font-bold">📅 {d.panchangTitle}</h2>
+          <p className="mt-3 text-sm md:text-base" style={{ color: "#6B5B4B" }}>
             {d.panchangDesc}
           </p>
-          <Link
-            to="/calendar"
-            className="inline-block px-8 py-3 rounded-full font-bold transition-transform hover:scale-105"
-            style={{ backgroundColor: "var(--gold)", color: "var(--maroon)" }}
+          <div className="mt-8 rounded-2xl bg-white p-4 sm:p-6 shadow-md" style={{ border: "1px solid var(--gold)" }}>
+            <CalendarContent showUpcomingFestivals={false} />
+          </div>
+        </div>
+      </section>
+
+      {/* 4 — Festivals */}
+      <section className="py-12 px-4 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="section-title text-xl md:text-2xl font-bold">🎉 {d.festivalsTitle}</h2>
+          <div
+            className="mt-8 rounded-2xl overflow-hidden shadow-md"
+            style={{ border: "1px solid var(--gold)" }}
           >
-            {d.openPanchang}
-          </Link>
+            {festivals.map((f, i) => (
+              <div
+                key={i}
+                className="px-5 py-4"
+                style={{
+                  backgroundColor: i % 2 === 0 ? "var(--cream)" : "#FFFFFF",
+                  borderBottom: "1px solid rgba(212,175,55,0.2)",
+                }}
+              >
+                <p
+                  className="font-bold"
+                  style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+                >
+                  {f.name}
+                </p>
+                <p className="text-sm" style={{ color: "#6B5B4B" }}>
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </main>

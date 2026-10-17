@@ -1,5 +1,23 @@
 import { useLanguage } from "../context/useLanguage";
+import { HistoryContent } from "./History";
+import { FacilitiesContent } from "./Facilities";
+import { GalleryContent } from "./Gallery";
 
+/**
+ * The "Virasat" tab — one complete, vertically scrollable page.
+ *
+ * Everything about the temple and its heritage is rendered here in order:
+ *   1. temple introduction and information
+ *   2. temple history
+ *   3. Solanki dynasty history and heritage  (<HistoryContent/>)
+ *   4. temple facilities and visitor information (<FacilitiesContent/>)
+ *   5. photo gallery, incl. the authentic trust-supplied photograph
+ *   6. festivals and other cultural content
+ *
+ * There is no secondary tab bar: each former sub-page contributes its real
+ * component, rendered inline. Nothing is duplicated — /history, /facilities
+ * and /gallery still render the very same components standalone.
+ */
 function Temple() {
   const { t } = useLanguage();
   const tp = t.temple;
@@ -129,7 +147,16 @@ function Temple() {
         </div>
       </section>
 
-      {/* Festivals */}
+      {/* 3 — Solanki dynasty history and heritage (from /history) */}
+      <HistoryContent />
+
+      {/* 4 — Temple facilities and visitor information (from /facilities) */}
+      <FacilitiesContent showAarti={false} />
+
+      {/* 5 — Photo gallery, incl. the authentic temple photograph (from /gallery) */}
+      <GalleryContent />
+
+      {/* 6 — Festivals and other cultural content */}
       <section className="py-12 px-4 bg-white">
         <div className="max-w-4xl mx-auto">
           <h2 className="section-title text-2xl font-bold">{tp.festivalTitle}</h2>
