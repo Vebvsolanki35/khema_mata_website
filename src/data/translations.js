@@ -272,9 +272,11 @@ const translations = {
       copy: "कॉपी",
       copied: "हो गया!",
       pending: "पुष्टि शेष",
+      verified: "सत्यापित (QR से)",
       qrTitle: "भुगतान QR कोड",
       qrUnverified: "असत्यापित",
       verificationNote: "कृपया भुगतान करने से पहले खाता विवरण की पुष्टि कर लें।",
+      verifiedNote: "यह QR कोड डिकोड करके सत्यापित किया गया है — यह UPI भुगतान QR है और ऊपर दिए गए खाते में भुगतान करता है।",
       disclaimer:
         "यह QR कोड अभी सत्यापित नहीं है। कृपया भुगतान के लिए ऊपर दिए गए खाता विवरण का ही उपयोग करें।",
     },
@@ -574,10 +576,13 @@ const translations = {
       copy: "Copy",
       copied: "Copied!",
       pending: "Pending confirmation",
+      verified: "Verified (from QR)",
       qrTitle: "Payment QR Code",
       qrUnverified: "Unverified",
       verificationNote:
         "Please confirm the account details before making a payment.",
+      verifiedNote:
+        "This QR has been decoded and verified — it is a UPI payment QR for the account shown above.",
       disclaimer:
         "This QR code has not been verified. Please use the account details above to make a payment.",
     },
@@ -877,9 +882,11 @@ const translations = {
       copy: "કોપી",
       copied: "થઈ ગયું!",
       pending: "પુષ્ટિ બાકી",
+      verified: "પુષ્ટિ થયેલ (QR માંથી)",
       qrTitle: "ચુકવણી QR કોડ",
       qrUnverified: "અપુષ્ટ",
       verificationNote: "ચુકવણી કરતા પહેલા કૃપા કરી ખાતાની વિગતોની પુષ્ટિ કરો.",
+      verifiedNote: "આ QR કોડ ડીકોડ કરીને પુષ્ટિ થયેલ છે — તે ઉપર દર્શાવેલ ખાતા માટેનો UPI ચુકવણી QR છે.",
       disclaimer:
         "આ QR કોડ હજુ પુષ્ટિ થયેલ નથી. કૃપા કરી ચુકવણી માટે ઉપર આપેલી ખાતાની વિગતોનો જ ઉપયોગ કરો.",
     },

@@ -17,14 +17,24 @@
  */
 
 export const MEDIA = {
-  /** Bank / payment QR supplied by the trust (from the ICICI card). */
-  bankQr: null, // e.g. "/assets/bank-qr.jpg"
+  /**
+   * Payment QR cropped from the trust's ICICI Bank card.
+   * Verified by decoding: it is a UPI QR paying to the account in
+   * src/config/donation.js. Original photo rotated 90° and cropped to the
+   * symbol + quiet zone; the payload was re-decoded from the delivered file to
+   * confirm the crop is still scannable.
+   */
+  bankQr: "/assets/bank-payment-qr.png",
 
-  /** WhatsApp group QR screenshot supplied by the trust. */
-  whatsappGroupQr: null, // e.g. "/assets/whatsapp-group-qr.png"
+  /**
+   * WhatsApp group QR cropped from the screenshot the trust supplied.
+   * Verified by decoding — it resolves to the same invitation as
+   * WHATSAPP_GROUP_INVITE.
+   */
+  whatsappGroupQr: "/assets/whatsapp-group-qr.png",
 
-  /** Authentic temple photograph (entrance shot) supplied by the trust. */
-  templeEntrance: null, // e.g. "/assets/temple-entrance.jpg"
+  /** Authentic temple entrance photograph supplied by the trust. */
+  templeEntrance: "/assets/temple-entrance.jpg",
 };
 
 export default MEDIA;

@@ -83,19 +83,28 @@ function Donation() {
                 className="flex items-center justify-between gap-3 p-4 rounded-2xl"
                 style={{
                   backgroundColor: "white",
-                  border: "1px solid rgba(212,175,55,0.4)",
+                  border: upi.verified
+                    ? "2px solid #15803D"
+                    : "1px solid rgba(212,175,55,0.4)",
                   boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
                 }}
               >
                 <div className="min-w-0">
                   <p className="text-xs text-gray-500 mb-1">{upi.label}</p>
                   <p
-                    className="font-bold text-base sm:text-lg break-all"
+                    className="font-bold text-sm sm:text-base break-all"
                     style={{ color: "var(--maroon)" }}
                   >
                     {upi.id}
                   </p>
-                  {!upi.verified && (
+                  {upi.verified ? (
+                    <p
+                      className="text-[11px] font-bold mt-1"
+                      style={{ color: "#15803D" }}
+                    >
+                      ✓ {t.bank.verified}
+                    </p>
+                  ) : (
                     <p className="text-[11px] mt-1" style={{ color: "#92400E" }}>
                       ⏳ {t.bank.pending}
                     </p>

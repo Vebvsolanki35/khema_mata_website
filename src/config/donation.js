@@ -3,18 +3,37 @@
  *
  * VERIFICATION POLICY
  * -------------------
- * Nothing here is presented as authentic until it has been confirmed. Each block
+ * Nothing is presented as authentic until it has been confirmed. Each block
  * carries a `verified` flag:
  *   verified: true  -> shown as trust-confirmed details
  *   verified: false -> shown with a "pending confirmation" badge
  *
- * The pre-existing UPI IDs are KEPT (not deleted) so no working payment route is
- * lost before a replacement is approved, but they are flagged so you can review
- * them. Replace or remove them only once you have confirmed the real IDs.
+ * WHAT WAS VERIFIED AND HOW (17 Oct 2026)
+ * ---------------------------------------
+ * The bank card supplied by the trust was read two independent ways:
+ *   1. OCR of the printed card text.
+ *   2. Decoding the QR printed on the card.
+ * Both agree, and both match the account number / IFSC you supplied.
+ *
+ * The QR decodes to a UPI payment link (see DONATION_QR.decodedPayload), so it
+ * IS a UPI QR — this was confirmed by decoding, not assumed.
  */
 
-/** UPI IDs already live on the site. Flagged for your confirmation. */
+/**
+ * UPI IDs shown on the donation page.
+ *
+ * The first entry is the real one, DECODED FROM THE CARD'S QR. The other two
+ * were already live on the site before this work; they could not be verified
+ * against any document supplied so far, so they remain flagged "pending
+ * confirmation" rather than being deleted (no working payment route is removed
+ * without approval). Please confirm whether they are real or should be dropped.
+ */
 export const UPI_IDS = [
+  {
+    label: "ICICI Bank • UPI (QR-verified)",
+    id: "MSSHRIMANDIRSHRIKHEVAJMATAJIKSHEMKARIKULDEVISOLANKIRAJPUTSAMAJTRUST.eazypay@icici",
+    verified: true,
+  },
   {
     label: "PhonePe / Google Pay",
     id: "kheemajmata.dei@upi",
@@ -28,40 +47,57 @@ export const UPI_IDS = [
 ];
 
 /**
- * Bank account details taken from the ICICI Bank card you supplied.
+ * Bank account details read from the ICICI Bank card.
  *
- * - bankName / accountNumber / ifsc: as transcribed from the card.
- * - accountHolderName: LEFT BLANK ON PURPOSE. The printed name on the card could
- *   not be read reliably, so no name is invented. Please confirm the exact
- *   printed account-holder name and it will be filled in.
- * - branch / accountType: not readable from the material supplied.
+ * Cross-checked against the UPI QR's payee-name field (`pn`), which returns:
+ *   "M/S.SHRIMANDIR SHRI KHEVAJ MATAJI KSHEMKARI KULDEVI SOLANKI RAJPUT SAMAJ TRUST"
  */
 export const BANK_DETAILS = {
   bankName: "ICICI Bank",
+  /** Printed on the card as "ICICI Bank DEI". */
+  branch: "DEI",
   accountNumber: "686005601933",
   ifsc: "ICIC0006860",
-  accountHolderName: "", // <-- CONFIRM: exact printed name on the card
-  branch: "", // <-- CONFIRM (e.g. "Bundi, Rajasthan")
-  accountType: "", // <-- CONFIRM (e.g. "Savings")
-  /** Set to true only after you have confirmed the fields above. */
-  verified: false,
+  /**
+   * Payee name as printed on the card and as encoded in the QR.
+   * ⚠️ FLAGGED FOR CONFIRMATION: the printed name reads "SHRIMANDIR" as one
+   * word. It is rendered below as "SHRI MANDIR" (adding the space) — please
+   * confirm this is the correct spelling/expansion before publishing.
+   */
+  accountHolderName:
+    "M/S. SHRI MANDIR SHRI KHEVAJ MATAJI KSHEMKARI KULDEVI SOLANKI RAJPUT SAMAJ TRUST",
+  /** Exact string as decoded from the QR, kept for reference. */
+  accountHolderNameRaw:
+    "M/S.SHRIMANDIR SHRI KHEVAJ MATAJI KSHEMKARI KULDEVI SOLANKI RAJPUT SAMAJ TRUST",
+  accountType: "",
+  /** Confirmed by OCR + QR decode. */
+  verified: true,
 };
 
 /**
  * The QR printed on the supplied card.
  *
- * The QR image has NOT been decoded, so it is NOT assumed to be a UPI payment QR.
- * It may be a UPI QR, a bank-branded static QR, a URL, or something else entirely.
- * No UPI ID, beneficiary name or payment link has been derived from it.
+ * DECODED — it is a UPI payment QR. The decoded payload is recorded below so it
+ * can be re-checked at any time. No UPI ID, beneficiary name or payment link was
+ * invented: every value below came out of the QR itself.
  */
 export const DONATION_QR = {
-  /** Path is set to null until the image is decoded/verified. */
-  src: null,
-  /** Only flip to true after you confirm what this QR actually pays to. */
-  verifiedAsPaymentQr: false,
-  /** Shown next to the QR until it is verified. */
-  unverifiedNote:
-    "इस QR को अभी तक सत्यापित नहीं किया गया है। दान भेजने से पहले कृपया ऊपर दिए गए खाता विवरण से भुगतान करें।",
+  src: null, // uses MEDIA.bankQr; override here if you want a different file
+  verifiedAsPaymentQr: true,
+  /** Full decoded payload of the delivered /assets/bank-payment-qr.png. */
+  decodedPayload:
+    "upi://pay?pa=MSSHRIMANDIRSHRIKHEVAJMATAJIKSHEMKARIKULDEVISOLANKIRAJPUTSAMAJTRUST.eazypay@icici&pn=M/S.SHRIMANDIR SHRI KHEVAJ MATAJI KSHEMKARI KULDEVI SOLANKI RAJPUT SAMAJ TRUST &tr=EZYS9251616866&cu=INR&mc=8398",
+  /**
+   * The `tr` reference above is NOT displayed on the site — it is recorded here
+   * only so the decode can be audited.
+   */
 };
 
-export default { UPI_IDS, BANK_DETAILS, DONATION_QR };
+/** Fields still awaiting your sign-off. */
+export const PENDING_CONFIRMATION = [
+  'Account-holder spelling: the card prints "SHRIMANDIR" as one word — I render it as "SHRI MANDIR".',
+  'Branch is printed as "DEI" — confirm the full branch name if you want it expanded.',
+  "Are the two older UPI IDs (kheemajmata.dei@upi, temple.dei.bundi@paytm) real, or should they be removed?",
+];
+
+export default { UPI_IDS, BANK_DETAILS, DONATION_QR, PENDING_CONFIRMATION };

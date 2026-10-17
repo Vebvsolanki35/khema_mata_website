@@ -70,18 +70,16 @@ function PaymentQrCard() {
             color: isVerified ? "#15803D" : "#92400E",
           }}
         >
-          {isVerified ? "✓ Verified" : `⚠️ ${b.qrUnverified}`}
+          {isVerified ? `✓ ${b.verified}` : `⚠️ ${b.qrUnverified}`}
         </span>
       </div>
 
-      {!isVerified && (
-        <p
-          className="mt-3 text-xs leading-relaxed max-w-xs mx-auto"
-          style={{ color: "#6B5B4B" }}
-        >
-          {b.disclaimer}
-        </p>
-      )}
+      <p
+        className="mt-3 text-xs leading-relaxed max-w-xs mx-auto"
+        style={{ color: "#6B5B4B" }}
+      >
+        {isVerified ? b.verifiedNote : b.disclaimer}
+      </p>
     </div>
   );
 }
