@@ -7,8 +7,6 @@ import VolunteerRegistration from "../components/seva/VolunteerRegistration";
 import { EXTERNAL_LINK_REL } from "../config/constants";
 import { FESTIVALS } from "../data/festivals";
 
-const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1920";
-
 const PHOTO_STRIP = [
   "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600",
   "https://images.unsplash.com/photo-1568454537842-d933259bb258?w=600",
@@ -82,9 +80,11 @@ function Home() {
         className="relative min-h-[86vh] flex items-center justify-center text-center overflow-hidden"
         style={{ minHeight: "86vh" }}
       >
+        {/* Image is set in CSS (.home-hero-bg) so phones get the smaller file. */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${HERO_IMG})` }}
+          className="absolute inset-0 home-hero-bg"
+          role="img"
+          aria-label={t.hero.title}
         />
         <div className="absolute inset-0 hero-overlay" />
         <div className="relative z-10 px-4 max-w-3xl mx-auto">

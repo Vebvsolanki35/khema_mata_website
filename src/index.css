@@ -69,6 +69,23 @@ body {
   color: #2D1B0E;
 }
 
+/* Hero photograph: Khema Mata temple.
+   Two sizes so phones don't download the desktop image. The desktop file is
+   centre-cropped to the band a wide hero actually shows, which is why it stays
+   small despite coming from a tall original. */
+.home-hero-bg {
+  background-image: url("/assets/home-hero-sm.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 768px) {
+  .home-hero-bg {
+    background-image: url("/assets/home-hero.jpg");
+  }
+}
+
 /* Hero overlay */
 .hero-overlay {
   background: linear-gradient(
