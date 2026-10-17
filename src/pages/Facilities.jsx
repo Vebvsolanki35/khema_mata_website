@@ -1,28 +1,45 @@
 import { useLanguage } from "../context/useLanguage";
 
-function Facilities() {
+/** Hero banner. Rendered above the Facilities content.
+ *  Kept separate so the parent page can inline the body only.
+ */
+function FacilitiesHero() {
+  const { t } = useLanguage();
+  const f = t.facilities;
+
+  return (
+    <section
+      className="py-16 px-4 text-center"
+      style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
+    >
+      <div className="text-5xl mb-4">⭐</div>
+      <h1
+        className="text-3xl md:text-4xl font-bold mb-2"
+        style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+      >
+        {f.title}
+      </h1>
+      <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
+        {f.subtitle}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * All Facilities content below the hero.
+ *
+ * Exported so Virasat (/temple) can render it inline as one continuous page.
+ * Nothing is removed: the /facilities route still renders exactly this
+ * content, unchanged and fully functional.
+ */
+export function FacilitiesContent({ showAarti = true }) {
   const { t } = useLanguage();
   const f = t.facilities;
   const aartis = t.temple.aartis;
 
   return (
-    <main>
-      {/* Hero */}
-      <section
-        className="py-16 px-4 text-center"
-        style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
-      >
-        <div className="text-5xl mb-4">⭐</div>
-        <h1
-          className="text-3xl md:text-4xl font-bold mb-2"
-          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-        >
-          {f.title}
-        </h1>
-        <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
-          {f.subtitle}
-        </p>
-      </section>
+    <>
 
       {/* Facility Cards */}
       <section className="py-14 px-4" style={{ backgroundColor: "var(--cream)" }}>
@@ -48,6 +65,7 @@ function Facilities() {
       </section>
 
       {/* Daily Aarti Timetable */}
+      {showAarti && (
       <section className="py-12 px-4 bg-white">
         <div className="max-w-2xl mx-auto">
           <h2 className="section-title text-2xl font-bold">{t.temple.aartiTitle}</h2>
@@ -84,8 +102,16 @@ function Facilities() {
           </div>
         </div>
       </section>
-    </main>
+      )}
+    </>
   );
 }
 
-export default Facilities;
+export default function Facilities() {
+  return (
+    <main>
+      <FacilitiesHero />
+      <FacilitiesContent />
+    </main>
+  );
+}

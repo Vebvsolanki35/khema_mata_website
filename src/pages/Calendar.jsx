@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FESTIVALS } from "../data/festivals";
 
 const TITHI_NAMES = [
   "प्रतिपदा","द्वितीया","तृतीया","चतुर्थी","पंचमी","षष्ठी","सप्तमी",
@@ -11,17 +12,6 @@ const HINDU_MONTHS = [
 ];
 
 const WEEKDAY_HI = ["रवि","सोम","मंगल","बुध","गुरु","शुक्र","शनि"];
-
-const FESTIVALS = [
-  { date: "2025-03-30", name: "चैत्र नवरात्रि प्रारंभ", type: "navratri", desc: "माँ शैलपुत्री की पूजा" },
-  { date: "2025-04-06", name: "रामनवमी", type: "festival", desc: "भगवान राम का जन्मदिन" },
-  { date: "2025-04-13", name: "हनुमान जयंती", type: "festival", desc: "बजरंगबली का प्रकटोत्सव" },
-  { date: "2025-10-02", name: "शारदीय नवरात्रि", type: "navratri", desc: "माँ दुर्गा के नौ स्वरूप" },
-  { date: "2025-10-12", name: "दशहरा", type: "festival", desc: "रावण दहन" },
-  { date: "2025-10-20", name: "दीपावली", type: "festival", desc: "लक्ष्मी पूजन, दीपों का महोत्सव" },
-  { date: "2025-11-05", name: "छठ पूजा", type: "festival", desc: "सूर्य देव को अर्घ्य" },
-  { date: "2026-03-19", name: "चैत्र नवरात्रि 2026", type: "navratri", desc: "माँ खेमज माता का विशेष उत्सव" },
-];
 
 const VRAT_CARDS = [
   {
@@ -89,7 +79,19 @@ function toHindiNumeral(n) {
   return String(n).split("").map(d => hindiDigits[parseInt(d)] || d).join("");
 }
 
-export default function Calendar() {
+
+/**
+ * The complete, interactive Hindu Panchang: today's tithi/paksha card, the
+ * navigable month grid with tithi colour legend, upcoming festivals and the
+ * vrat detail modal.
+ *
+ * Exported so Darshan (/darshan) can render the Panchang inline as part of one
+ * continuous page. Every interactive feature is untouched — month navigation,
+ * date selection and the vrat modal all still work.
+ *
+ * Nothing is removed: /calendar still renders exactly this content.
+ */
+export function CalendarContent({ showUpcomingFestivals = true }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -124,14 +126,7 @@ export default function Calendar() {
     .slice(0, 5);
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
-      <h1
-        className="text-3xl font-bold text-center mb-2"
-        style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-      >
-        🗓️ हिंदू पंचांग
-      </h1>
-      <p className="text-center text-sm text-gray-500 mb-8">तिथि, पक्ष, माह और व्रत जानकारी</p>
+    <>
 
       {/* Today's info */}
       <div
@@ -222,6 +217,7 @@ export default function Calendar() {
       </div>
 
       {/* Upcoming Festivals */}
+      {showUpcomingFestivals && (
       <div className="mb-8">
         <h2 className="text-xl font-bold mb-4" style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}>
           🎉 आगामी त्योहार
@@ -252,6 +248,7 @@ export default function Calendar() {
           )}
         </div>
       </div>
+      )}
 
       {/* Vrat Cards */}
       <div>
@@ -304,6 +301,21 @@ export default function Calendar() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+export default function Calendar() {
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <h1
+        className="text-3xl font-bold text-center mb-2"
+        style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+      >
+        🗓️ हिंदू पंचांग
+      </h1>
+      <p className="text-center text-sm text-gray-500 mb-8">तिथि, पक्ष, माह और व्रत जानकारी</p>
+      <CalendarContent />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../context/useLanguage";
 import { supabase } from "../lib/supabase";
+import { MEDIA } from "../config/media";
 
 const DEFAULT_IMAGES = [
   { url: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", title: "राजस्थान मंदिर" },
@@ -17,7 +18,36 @@ const DEFAULT_IMAGES = [
   { url: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=600", title: "जयपुर हवा महल" },
 ];
 
-function Gallery() {
+/** Hero banner. Rendered above the Gallery content.
+ *  Kept separate so the parent page can inline the body only.
+ */
+function GalleryHero() {
+  const { t } = useLanguage();
+
+  return (
+    <section
+      className="py-16 px-4 text-center"
+      style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
+    >
+      <div className="text-5xl mb-4">📷</div>
+      <h1
+        className="text-3xl md:text-4xl font-bold mb-2"
+        style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+      >
+        {t.gallery.title}
+      </h1>
+    </section>
+  );
+}
+
+/**
+ * All Gallery content below the hero.
+ *
+ * Exported so Virasat (/temple) can render it inline as one continuous page.
+ * Nothing is removed: the /gallery route still renders exactly this
+ * content, unchanged and fully functional.
+ */
+export function GalleryContent() {
   const { t } = useLanguage();
   const [selected, setSelected] = useState(null);
   const [dbImages, setDbImages] = useState([]);
@@ -58,23 +88,23 @@ function Gallery() {
     setUploading(false);
   };
 
-  const allImages = [...dbImages, ...DEFAULT_IMAGES];
+  /**
+   * The authentic temple photograph supplied by the trust.
+   * Shown first with a caption. It is NEVER replaced by generated or stock
+   * imagery — when `MEDIA.templeEntrance` is null the slot simply isn't rendered.
+   */
+  const featured = MEDIA.templeEntrance
+    ? {
+        url: MEDIA.templeEntrance,
+        title: t.gallery.featuredCaption,
+        featured: true,
+      }
+    : null;
+
+  const allImages = [...(featured ? [featured] : []), ...dbImages, ...DEFAULT_IMAGES];
 
   return (
-    <main>
-      {/* Hero */}
-      <section
-        className="py-16 px-4 text-center"
-        style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
-      >
-        <div className="text-5xl mb-4">📷</div>
-        <h1
-          className="text-3xl md:text-4xl font-bold mb-2"
-          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-        >
-          {t.gallery.title}
-        </h1>
-      </section>
+    <>
 
       {/* Gallery Grid */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
@@ -106,15 +136,33 @@ function Gallery() {
                 key={idx}
                 className="masonry-item"
                 onClick={() => setSelected(img)}
-                style={{ border: "2px solid transparent", transition: "border-color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "var(--gold)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                style={{
+                  border: img.featured
+                    ? "3px solid var(--gold)"
+                    : "2px solid transparent",
+                  transition: "border-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--gold)")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderColor = img.featured
+                    ? "var(--gold)"
+                    : "transparent")
+                }
               >
                 <img
                   src={img.url}
                   alt={img.title}
                   loading="lazy"
+                  decoding="async"
                 />
+                {img.featured && (
+                  <p
+                    className="text-[11px] font-bold px-2 py-1 text-center"
+                    style={{ backgroundColor: "var(--maroon)", color: "var(--gold)" }}
+                  >
+                    ⭐ {t.gallery.featuredLabel}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -155,8 +203,15 @@ function Gallery() {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }
 
-export default Gallery;
+export default function Gallery() {
+  return (
+    <main>
+      <GalleryHero />
+      <GalleryContent />
+    </main>
+  );
+}

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import BroadcastCenter from "../components/admin/BroadcastCenter";
+import TabVolunteers from "../components/admin/TabVolunteers";
 
 function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -420,6 +422,8 @@ const TABS = [
   { id: "whatsapp", label: "💬 WhatsApp ग्रुप" },
   { id: "gallery", label: "🖼️ गैलरी" },
   { id: "content", label: "⚙️ सामग्री" },
+  { id: "notices", label: "📻 प्रसारण केंद्र" },
+  { id: "volunteers", label: "🙋 सेवा आवेदन" },
 ];
 
 function AdminDashboard() {
@@ -463,6 +467,8 @@ function AdminDashboard() {
         {activeTab === "whatsapp" && <TabWhatsApp />}
         {activeTab === "gallery" && <TabGallery />}
         {activeTab === "content" && <TabContent />}
+        {activeTab === "notices" && <BroadcastCenter />}
+        {activeTab === "volunteers" && <TabVolunteers />}
       </section>
     </main>
   );

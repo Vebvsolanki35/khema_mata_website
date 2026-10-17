@@ -17,7 +17,7 @@ const CHECKLIST_ITEMS = {
     "प्रसाद / चुनरी / पुष्प माँ के लिए",
     "मोबाइल चार्जर और पावर बैंक",
     "गूगल मैप्स में 'खेमज माता मंदिर, देई, बूंदी' सेव करें",
-    "मंदिर ट्रस्ट का WhatsApp नंबर सेव करें",
+    "मंदिर ट्रस्ट के आधिकारिक WhatsApp ग्रुप में शामिल हों",
   ],
   en: [
     "ID Proof (Aadhaar Card / Voter ID)",
@@ -26,7 +26,7 @@ const CHECKLIST_ITEMS = {
     "Prasad / Chunri / Flowers for Maa",
     "Mobile charger and power bank",
     "Save 'Khemaj Mata Temple, Dei, Bundi' on Google Maps",
-    "Save Temple Trust WhatsApp number",
+    "Join the official Temple Trust WhatsApp group",
   ],
   gu: [
     "ઓળખ પ્રૂફ (આધાર કાર્ડ / વોટર આઈડી)",
@@ -35,7 +35,7 @@ const CHECKLIST_ITEMS = {
     "પ્રસાદ / ચૂંદડી / ફૂલ માતા માટે",
     "મોબાઇલ ચાર્જર અને પાવર બૅંક",
     "Google Maps પર 'ખેમજ માતા મંદિર, દેઈ, બૂંદી' સેવ કરો",
-    "મંદિર ટ્રસ્ટ WhatsApp નંબર સેવ કરો",
+    "મંદિર ટ્રસ્ટના અધિકૃત WhatsApp ગ્રૂપમાં જોડાઓ",
   ],
 };
 
@@ -86,8 +86,48 @@ const BEST_SEASONS = [
   },
 ];
 
-function Planner() {
+/** Hero banner. Rendered above the Planner content.
+ *  Kept separate so the parent page can inline the body only.
+ */
+function PlannerHero() {
   const { language, t } = useLanguage();
+
+  return (
+    <section
+      className="py-16 px-4 text-center"
+      style={{ background: "linear-gradient(135deg, var(--maroon) 0%, #6B1313 100%)" }}
+    >
+      <div className="text-5xl mb-4">🗓️</div>
+      <h1
+        className="text-3xl md:text-5xl font-bold mb-2"
+        style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+      >
+        {t.nav.planner}
+      </h1>
+      <p className="text-lg opacity-90 mb-6" style={{ color: "#FFF8F0" }}>
+        {language === "en"
+          ? "Plan your perfect pilgrimage to Shri Khemaj Mata Temple"
+          : language === "gu"
+          ? "શ્રી ખેમજ માતા મંદિરની યાત્રા આયોજન કરો"
+          : "श्री खेमज माता मंदिर की यात्रा की पूरी योजना बनाएं"}
+      </p>
+      {/* Live Weather */}
+      <div className="flex justify-center">
+        <WeatherWidget />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * All Planner content below the hero.
+ *
+ * Exported so Yatra (/visit) can render it inline as one continuous page.
+ * Nothing is removed: the /planner route still renders exactly this
+ * content, unchanged and fully functional.
+ */
+export function PlannerContent({ showChecklist = true, showMapEmbed = true }) {
+  const { language } = useLanguage();
   const [checkedItems, setCheckedItems] = useState({});
 
   const checklistItems = CHECKLIST_ITEMS[language] || CHECKLIST_ITEMS.hi;
@@ -108,31 +148,7 @@ function Planner() {
   };
 
   return (
-    <main>
-      {/* Hero */}
-      <section
-        className="py-16 px-4 text-center"
-        style={{ background: "linear-gradient(135deg, var(--maroon) 0%, #6B1313 100%)" }}
-      >
-        <div className="text-5xl mb-4">🗓️</div>
-        <h1
-          className="text-3xl md:text-5xl font-bold mb-2"
-          style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-        >
-          {t.nav.planner}
-        </h1>
-        <p className="text-lg opacity-90 mb-6" style={{ color: "#FFF8F0" }}>
-          {language === "en"
-            ? "Plan your perfect pilgrimage to Shri Khemaj Mata Temple"
-            : language === "gu"
-            ? "શ્રી ખેમજ માતા મંદિરની યાત્રા આયોજન કરો"
-            : "श्री खेमज माता मंदिर की यात्रा की पूरी योजना बनाएं"}
-        </p>
-        {/* Live Weather */}
-        <div className="flex justify-center">
-          <WeatherWidget />
-        </div>
-      </section>
+    <>
 
       {/* Darshan Timings */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
@@ -261,6 +277,7 @@ function Planner() {
       </section>
 
       {/* Packing Checklist */}
+      {showChecklist && (
       <section className="py-12 px-4 bg-white">
         <div className="max-w-2xl mx-auto">
           <h2 className="section-title text-2xl font-bold">
@@ -317,8 +334,10 @@ function Planner() {
           </p>
         </div>
       </section>
+      )}
 
       {/* Map Embed */}
+      {showMapEmbed && (
       <section className="py-12 px-4" style={{ backgroundColor: "var(--maroon)" }}>
         <div className="max-w-4xl mx-auto">
           <h2 className="section-title text-2xl font-bold" style={{ color: "var(--gold)" }}>
@@ -351,8 +370,16 @@ function Planner() {
           </p>
         </div>
       </section>
-    </main>
+      )}
+    </>
   );
 }
 
-export default Planner;
+export default function Planner() {
+  return (
+    <main>
+      <PlannerHero />
+      <PlannerContent />
+    </main>
+  );
+}

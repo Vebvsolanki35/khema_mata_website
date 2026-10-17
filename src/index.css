@@ -7,6 +7,10 @@
   --gold: #D4AF37;
   --maroon-dark: #6B1313;
   --saffron-light: #FF8C42;
+
+  /* WhatsApp: AA-contrast variant of the brand green (#25D366 is only 1.98:1
+     against white). Keep in sync with WHATSAPP_GREEN in src/config/constants.js */
+  --whatsapp: #188748;
 }
 
 body {
@@ -55,14 +59,31 @@ body {
 .float-whatsapp {
   bottom: 80px;
   right: 20px;
-  background: #25D366;
-  color: white;
+  background: var(--whatsapp);
+  color: #FFFFFF;
 }
 .float-donate {
   bottom: 140px;
   right: 20px;
   background: var(--gold);
   color: #2D1B0E;
+}
+
+/* Hero photograph: Khema Mata temple.
+   Two sizes so phones don't download the desktop image. The desktop file is
+   centre-cropped to the band a wide hero actually shows, which is why it stays
+   small despite coming from a tall original. */
+.home-hero-bg {
+  background-image: url("/assets/home-hero-sm.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 768px) {
+  .home-hero-bg {
+    background-image: url("/assets/home-hero.jpg");
+  }
 }
 
 /* Hero overlay */

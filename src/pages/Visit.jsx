@@ -1,7 +1,24 @@
 import { useState } from "react";
 import { useLanguage } from "../context/useLanguage";
 import routes from "../data/routes";
+import WeatherWidget from "../components/WeatherWidget";
+import { PlannerContent } from "./Planner";
 
+/**
+ * The "Yatra" tab — one complete, vertically scrollable page.
+ *
+ * Ordered the way a visitor actually plans a journey:
+ *   1. trip planner — enter your city, get live directions
+ *   2. temple location and maps
+ *   3. routes and directions from major cities
+ *   4. travel planner tools — best time to visit, packing checklist, map
+ *   5. accommodation
+ *   6. travel tips and guidance
+ *
+ * There is no secondary tab bar: the travel planner's real components are
+ * rendered inline, so the city input, route data, maps and the interactive
+ * packing checklist all keep working. /planner still renders them standalone.
+ */
 function Visit() {
   const { t, language } = useLanguage();
   const v = t.visit;
@@ -37,9 +54,13 @@ function Visit() {
         >
           {v.title}
         </h1>
-        <p className="text-lg opacity-90" style={{ color: "#FFF8F0" }}>
+        <p className="text-lg opacity-90 mb-6" style={{ color: "#FFF8F0" }}>
           {v.subtitle}
         </p>
+        {/* Live weather — carried over from the travel planner page */}
+        <div className="flex justify-center">
+          <WeatherWidget />
+        </div>
       </section>
 
       {/* Trip Planner */}
@@ -224,7 +245,14 @@ function Visit() {
         </div>
       </section>
 
-      {/* Accommodation */}
+      {/*
+        4 — Travel planner tools, rendered inline from /planner:
+        routes from major cities, best time to visit, the interactive packing
+        checklist and the temple location map.
+      */}
+      <PlannerContent showChecklist={false} showMapEmbed={false} />
+
+      {/* 5 — Accommodation */}
       <section className="py-12 px-4" style={{ backgroundColor: "#FFF0E0" }}>
         <div className="max-w-4xl mx-auto">
           <h2 className="section-title text-2xl font-bold">{v.accomTitle}</h2>
