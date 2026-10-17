@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import Testimonials from "../components/Testimonials";
+import NoticesSection from "../components/notices/NoticesSection";
+import VolunteerRegistration from "../components/seva/VolunteerRegistration";
 import { EXTERNAL_LINK_REL } from "../config/constants";
 import { FESTIVALS } from "../data/festivals";
 
@@ -136,6 +138,11 @@ function Home() {
         </div>
       </section>
 
+      {/* Live Temple Notices — published by authorised Trust members.
+          Sits just below the intro block so important updates are seen early,
+          without displacing the temple name and introduction from the top. */}
+      <NoticesSection />
+
       {/* Today's darshan + aarti highlights */}
       <section className="py-14 px-4" style={{ backgroundColor: "var(--cream)" }}>
         <div className="max-w-5xl mx-auto">
@@ -233,7 +240,7 @@ function Home() {
 
           <div>
             <h2 className="section-title text-xl md:text-2xl font-bold">
-              📢 {t.noticesTitle}
+              ℹ️ {t.generalInfoTitle}
             </h2>
             <ul className="space-y-2.5 mt-6">
               {t.notices.map((notice, i) => (
@@ -314,6 +321,9 @@ function Home() {
           </Link>
         </div>
       </section>
+
+      {/* Seva & Volunteer Registration — grouped with the donation CTA */}
+      <VolunteerRegistration />
 
       {/* Testimonials */}
       <Testimonials />

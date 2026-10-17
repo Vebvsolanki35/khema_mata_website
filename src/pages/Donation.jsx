@@ -6,6 +6,7 @@ import BankDetailsCard from "../components/BankDetailsCard";
 import PaymentQrCard from "../components/PaymentQrCard";
 import CopyButton from "../components/CopyButton";
 import WhatsAppButton from "../components/WhatsAppButton";
+import VolunteerRegistration from "../components/seva/VolunteerRegistration";
 
 /** Builds the message a donor would send the trust after paying. */
 function donationMessage(amount, d) {
@@ -249,6 +250,10 @@ function Donation() {
           </WhatsAppButton>
         </section>
       </div>
+
+      {/* Seva & Volunteer Registration — the same shared component used on the
+          homepage, rendered here so the सेवा tab carries it too. */}
+      <VolunteerRegistration />
     </main>
   );
 }
