@@ -17,7 +17,7 @@ const CHECKLIST_ITEMS = {
     "प्रसाद / चुनरी / पुष्प माँ के लिए",
     "मोबाइल चार्जर और पावर बैंक",
     "गूगल मैप्स में 'खेमज माता मंदिर, देई, बूंदी' सेव करें",
-    "मंदिर ट्रस्ट का WhatsApp नंबर सेव करें",
+    "मंदिर ट्रस्ट के आधिकारिक WhatsApp ग्रुप में शामिल हों",
   ],
   en: [
     "ID Proof (Aadhaar Card / Voter ID)",
@@ -26,7 +26,7 @@ const CHECKLIST_ITEMS = {
     "Prasad / Chunri / Flowers for Maa",
     "Mobile charger and power bank",
     "Save 'Khemaj Mata Temple, Dei, Bundi' on Google Maps",
-    "Save Temple Trust WhatsApp number",
+    "Join the official Temple Trust WhatsApp group",
   ],
   gu: [
     "ઓળખ પ્રૂફ (આધાર કાર્ડ / વોટર આઈડી)",
@@ -35,7 +35,7 @@ const CHECKLIST_ITEMS = {
     "પ્રસાદ / ચૂંદડી / ફૂલ માતા માટે",
     "મોબાઇલ ચાર્જર અને પાવર બૅંક",
     "Google Maps પર 'ખેમજ માતા મંદિર, દેઈ, બૂંદી' સેવ કરો",
-    "મંદિર ટ્રસ્ટ WhatsApp નંબર સેવ કરો",
+    "મંદિર ટ્રસ્ટના અધિકૃત WhatsApp ગ્રૂપમાં જોડાઓ",
   ],
 };
 

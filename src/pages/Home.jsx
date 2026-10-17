@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import Testimonials from "../components/Testimonials";
+import WhatsAppGroupSection from "../components/WhatsAppGroupSection";
+import TrustCommittee from "../components/TrustCommittee";
+import { EXTERNAL_LINK_REL } from "../config/constants";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1920";
 
@@ -156,23 +159,47 @@ function Home() {
             🙏 {t.quickServicesTitle}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-            {t.quickCards.map((card, i) => (
-              <a
-                key={i}
-                href={card.link}
-                className="temple-card bg-white rounded-2xl p-6 text-center block"
-                style={{ textDecoration: "none" }}
-              >
-                <div className="text-4xl mb-3">{card.icon}</div>
-                <h3
-                  className="font-bold text-lg mb-2"
-                  style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+            {t.quickCards.map((card, i) => {
+              const cardBody = (
+                <>
+                  <div className="text-4xl mb-3">{card.icon}</div>
+                  <h3
+                    className="font-bold text-lg mb-2"
+                    style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">{card.desc}</p>
+                </>
+              );
+
+              // External links (e.g. the WhatsApp group invite) must open safely.
+              if (card.external) {
+                return (
+                  <a
+                    key={i}
+                    href={card.link}
+                    target="_blank"
+                    rel={EXTERNAL_LINK_REL}
+                    className="temple-card bg-white rounded-2xl p-6 text-center block"
+                    style={{ textDecoration: "none" }}
+                  >
+                    {cardBody}
+                  </a>
+                );
+              }
+
+              return (
+                <Link
+                  key={i}
+                  to={card.link}
+                  className="temple-card bg-white rounded-2xl p-6 text-center block"
+                  style={{ textDecoration: "none" }}
                 >
-                  {card.title}
-                </h3>
-                <p className="text-sm text-gray-600">{card.desc}</p>
-              </a>
-            ))}
+                  {cardBody}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -211,6 +238,9 @@ function Home() {
       {/* Testimonials */}
       <Testimonials />
 
+      {/* Join the official WhatsApp group */}
+      <WhatsAppGroupSection />
+
       {/* Photo Strip */}
       <section className="py-8 px-4" style={{ backgroundColor: "var(--maroon)" }}>
         <div className="max-w-6xl mx-auto">
@@ -227,6 +257,9 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* Trust Committee */}
+      <TrustCommittee />
 
       {/* History Teaser */}
       <section className="py-16 px-4 bg-white">

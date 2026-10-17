@@ -64,6 +64,41 @@ npm run dev
 npm run build
 ```
 
+## Configuration: contact links and media
+
+| File | What it controls |
+|---|---|
+| `src/config/constants.js` | WhatsApp **group invitation** URL and the optional direct-chat number |
+| `src/config/donation.js` | Bank account details, UPI IDs, payment QR verification state |
+| `src/config/media.js` | Paths to images supplied by the trust (QR codes, temple photo) |
+| `src/data/trustCommittee.js` | Trust committee roster and what is published |
+| `src/data/translations.js` | All Hindi / English / Gujarati strings |
+
+### WhatsApp group
+
+`WHATSAPP_GROUP_INVITE` in `src/config/constants.js` is the single source for the
+group invitation. Every "join the group" button renders through
+`src/components/WhatsAppButton.jsx`, so it always opens in a new tab with
+`rel="noopener noreferrer"`.
+
+To re-enable direct 1-to-1 WhatsApp messages, put a real number in
+`WHATSAPP_DIRECT_NUMBER` (digits + country code, e.g. `919876543210`). While it
+is empty, direct-message buttons fall back to the group invitation.
+
+### Adding trust photographs
+
+1. Drop the file in `public/assets/`.
+2. Set the matching key in `src/config/media.js` to `/assets/<filename>`.
+3. It renders automatically — no component changes needed.
+
+See `public/assets/README.md` for details.
+
+### Publishing a committee member
+
+Set `published: true` on the member in `src/data/trustCommittee.js`. Only
+published members appear on the site, so unverified profiles are never shown.
+
+
 ## Admin Panel
 
 Visit `/admin` in your browser. You will be redirected to `/admin/login` if not authenticated. Use Supabase Auth credentials (email + password) to log in.

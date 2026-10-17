@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../context/useLanguage";
 import { supabase } from "../lib/supabase";
+import { MEDIA } from "../config/media";
 
 const DEFAULT_IMAGES = [
   { url: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600", title: "राजस्थान मंदिर" },
@@ -58,7 +59,20 @@ function Gallery() {
     setUploading(false);
   };
 
-  const allImages = [...dbImages, ...DEFAULT_IMAGES];
+  /**
+   * The authentic temple photograph supplied by the trust.
+   * Shown first with a caption. It is NEVER replaced by generated or stock
+   * imagery — when `MEDIA.templeEntrance` is null the slot simply isn't rendered.
+   */
+  const featured = MEDIA.templeEntrance
+    ? {
+        url: MEDIA.templeEntrance,
+        title: t.gallery.featuredCaption,
+        featured: true,
+      }
+    : null;
+
+  const allImages = [...(featured ? [featured] : []), ...dbImages, ...DEFAULT_IMAGES];
 
   return (
     <main>
@@ -106,15 +120,33 @@ function Gallery() {
                 key={idx}
                 className="masonry-item"
                 onClick={() => setSelected(img)}
-                style={{ border: "2px solid transparent", transition: "border-color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "var(--gold)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                style={{
+                  border: img.featured
+                    ? "3px solid var(--gold)"
+                    : "2px solid transparent",
+                  transition: "border-color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--gold)")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.borderColor = img.featured
+                    ? "var(--gold)"
+                    : "transparent")
+                }
               >
                 <img
                   src={img.url}
                   alt={img.title}
                   loading="lazy"
+                  decoding="async"
                 />
+                {img.featured && (
+                  <p
+                    className="text-[11px] font-bold px-2 py-1 text-center"
+                    style={{ backgroundColor: "var(--maroon)", color: "var(--gold)" }}
+                  >
+                    ⭐ {t.gallery.featuredLabel}
+                  </p>
+                )}
               </div>
             ))}
           </div>

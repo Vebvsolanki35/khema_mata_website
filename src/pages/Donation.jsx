@@ -1,25 +1,45 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLanguage } from "../context/useLanguage";
-import { WHATSAPP_NUMBER } from "../config/constants";
+import { WHATSAPP_GROUP_INVITE, HAS_DIRECT_WHATSAPP, whatsAppDirectUrl } from "../config/constants";
+import { UPI_IDS } from "../config/donation";
+import BankDetailsCard from "../components/BankDetailsCard";
+import PaymentQrCard from "../components/PaymentQrCard";
+import CopyButton from "../components/CopyButton";
+import WhatsAppButton from "../components/WhatsAppButton";
+
+/** Builds the message a donor would send the trust after paying. */
+function donationMessage(amount, d) {
+  const amountText = amount ? `₹${amount}` : "";
+  return [
+    "🙏 दान - " + amountText,
+    d.messageLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 function Donation() {
   const { t } = useLanguage();
   const d = t.donation;
-  const [copied, setCopied] = useState(null);
   const [selectedAmt, setSelectedAmt] = useState(null);
+  const payPanelRef = useRef(null);
 
-  const handleCopy = (id, idx) => {
-    navigator.clipboard.writeText(id).then(() => {
-      setCopied(idx);
-      setTimeout(() => setCopied(null), 2000);
+  const scrollToPayPanel = () => {
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    payPanelRef.current?.scrollIntoView({
+      behavior: prefersReduced ? "auto" : "smooth",
+      block: "center",
     });
   };
 
-  const handleDonate = (amount) => {
-    const msg = encodeURIComponent(
-      `🙏 दान - ₹${amount}\nखेमज माता मंदिर देई बूंदी को दान`
-    );
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
+  const handleAmount = (amount) => {
+    setSelectedAmt(amount);
+    scrollToPayPanel();
+  };
+
+  const handleSeva = (seva) => {
+    setSelectedAmt(seva.amount.replace(/[^\d]/g, ""));
+    scrollToPayPanel();
   };
 
   return (
@@ -42,56 +62,53 @@ function Donation() {
       </section>
 
       <div className="max-w-3xl mx-auto px-4 py-12 space-y-10">
+        {/* Bank account details (verified block, with copy buttons) */}
+        <section>
+          <h2 className="section-title text-xl font-bold">{d.bankSectionTitle}</h2>
+          <BankDetailsCard />
+        </section>
+
+        {/* Payment QR — separate from the WhatsApp group QR */}
+        <section className="text-center">
+          <PaymentQrCard />
+        </section>
+
         {/* UPI IDs */}
         <section>
           <h2 className="section-title text-xl font-bold">{d.upiTitle}</h2>
           <div className="space-y-4 mt-8">
-            {d.upiIds.map((upi, i) => (
+            {UPI_IDS.map((upi, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-4 rounded-2xl"
-                style={{ backgroundColor: "white", border: "1px solid rgba(212,175,55,0.4)", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}
+                className="flex items-center justify-between gap-3 p-4 rounded-2xl"
+                style={{
+                  backgroundColor: "white",
+                  border: "1px solid rgba(212,175,55,0.4)",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                }}
               >
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-gray-500 mb-1">{upi.label}</p>
                   <p
-                    className="font-bold text-lg"
+                    className="font-bold text-base sm:text-lg break-all"
                     style={{ color: "var(--maroon)" }}
                   >
                     {upi.id}
                   </p>
+                  {!upi.verified && (
+                    <p className="text-[11px] mt-1" style={{ color: "#92400E" }}>
+                      ⏳ {t.bank.pending}
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={() => handleCopy(upi.id, i)}
-                  className="px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-                  style={
-                    copied === i
-                      ? { backgroundColor: "#22c55e", color: "white" }
-                      : { backgroundColor: "var(--saffron)", color: "white" }
-                  }
-                >
-                  {copied === i ? "✓ " + d.copied : d.copyBtn}
-                </button>
+                <CopyButton
+                  value={upi.id}
+                  label={t.bank.copy}
+                  copiedLabel={t.bank.copied}
+                  ariaLabel={`${upi.label} ${t.bank.copy}`}
+                />
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* QR Code Placeholder */}
-        <section className="text-center">
-          <div
-            className="inline-block p-6 rounded-2xl"
-            style={{ backgroundColor: "white", border: "2px solid var(--gold)", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
-          >
-            <div
-              className="w-40 h-40 mx-auto rounded-xl flex items-center justify-center text-4xl"
-              style={{ backgroundColor: "var(--cream)", border: "2px dashed var(--gold)" }}
-            >
-              📱
-            </div>
-            <p className="mt-3 font-semibold text-sm" style={{ color: "var(--maroon)" }}>
-              QR Code - kheemajmata.dei@upi
-            </p>
           </div>
         </section>
 
@@ -102,7 +119,8 @@ function Donation() {
             {d.amounts.map((amt, i) => (
               <button
                 key={i}
-                onClick={() => { setSelectedAmt(amt); handleDonate(amt); }}
+                onClick={() => handleAmount(amt)}
+                aria-pressed={selectedAmt === amt}
                 className="py-3 px-2 rounded-xl font-bold text-base transition-all hover:scale-105"
                 style={
                   selectedAmt === amt
@@ -123,8 +141,9 @@ function Donation() {
             {d.sevas.map((seva, i) => (
               <button
                 key={i}
-                onClick={() => handleDonate(seva.amount.replace(/[^\d]/g, ""))}
-                className="flex items-center justify-between p-4 rounded-xl text-left temple-card transition-all"
+                onClick={() => handleSeva(seva)}
+                aria-pressed={selectedAmt === seva.amount.replace(/[^\d]/g, "")}
+                className="flex items-center justify-between gap-3 p-4 rounded-xl text-left temple-card transition-all"
                 style={{ backgroundColor: "white", border: "1px solid rgba(212,175,55,0.3)" }}
               >
                 <span
@@ -144,7 +163,61 @@ function Donation() {
           </div>
         </section>
 
-        {/* WhatsApp Contact */}
+        {/* How to complete the donation */}
+        <section ref={payPanelRef} className="scroll-mt-24">
+          <div
+            className="rounded-2xl p-6"
+            style={{
+              backgroundColor: "#FFFFFF",
+              border: "2px solid var(--gold)",
+              boxShadow: "0 4px 20px rgba(139,26,26,0.10)",
+            }}
+          >
+            <h3
+              className="text-lg font-bold mb-2"
+              style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
+            >
+              {d.howToTitle}
+              {selectedAmt ? ` — ₹${selectedAmt}` : ""}
+            </h3>
+            <p className="text-sm mb-5" style={{ color: "#4A3728" }}>
+              {d.howToDesc}
+            </p>
+
+            <ol
+              className="space-y-3 text-sm mb-6"
+              style={{ color: "#4A3728" }}
+            >
+              {[d.howToStep1, d.howToStep2, d.howToStep3].map((step, i) => (
+                <li key={i} className="flex gap-3">
+                  <span
+                    className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: "var(--gold)", color: "var(--maroon)" }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <WhatsAppButton
+                href={
+                  HAS_DIRECT_WHATSAPP
+                    ? whatsAppDirectUrl(donationMessage(selectedAmt, d))
+                    : WHATSAPP_GROUP_INVITE
+                }
+                iconSize={18}
+                className="flex-1 px-6 py-3 rounded-full text-sm sm:text-base"
+              >
+                {HAS_DIRECT_WHATSAPP ? d.sendReceiptRequest : d.notifyGroupBtn}
+              </WhatsAppButton>
+            </div>
+          </div>
+        </section>
+
+        {/* WhatsApp contact */}
         <section
           className="p-6 rounded-2xl text-center"
           style={{ backgroundColor: "var(--maroon)", border: "1px solid var(--gold)" }}
@@ -158,15 +231,13 @@ function Donation() {
           <p className="mb-4 text-sm opacity-90" style={{ color: "#FFF8F0" }}>
             {d.whatsappDesc}
           </p>
-          <a
-            href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("🙏 मैं मंदिर में दान करना चाहता/चाहती हूँ")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-8 py-3 rounded-full font-bold text-base transition-transform hover:scale-105"
-            style={{ backgroundColor: "#25D366", color: "white" }}
+          <WhatsAppButton
+            href={WHATSAPP_GROUP_INVITE}
+            iconSize={18}
+            className="px-8 py-3 rounded-full text-base"
           >
-            📞 WhatsApp करें
-          </a>
+            {d.joinGroupBtn}
+          </WhatsAppButton>
         </section>
       </div>
     </main>
