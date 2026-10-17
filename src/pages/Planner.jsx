@@ -126,7 +126,7 @@ function PlannerHero() {
  * Nothing is removed: the /planner route still renders exactly this
  * content, unchanged and fully functional.
  */
-export function PlannerContent({ showMapEmbed = true }) {
+export function PlannerContent({ showChecklist = true, showMapEmbed = true }) {
   const { language } = useLanguage();
   const [checkedItems, setCheckedItems] = useState({});
 
@@ -277,6 +277,7 @@ export function PlannerContent({ showMapEmbed = true }) {
       </section>
 
       {/* Packing Checklist */}
+      {showChecklist && (
       <section className="py-12 px-4 bg-white">
         <div className="max-w-2xl mx-auto">
           <h2 className="section-title text-2xl font-bold">
@@ -333,6 +334,7 @@ export function PlannerContent({ showMapEmbed = true }) {
           </p>
         </div>
       </section>
+      )}
 
       {/* Map Embed */}
       {showMapEmbed && (

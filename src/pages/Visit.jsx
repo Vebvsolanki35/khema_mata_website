@@ -250,7 +250,7 @@ function Visit() {
         routes from major cities, best time to visit, the interactive packing
         checklist and the temple location map.
       */}
-      <PlannerContent showMapEmbed={false} />
+      <PlannerContent showChecklist={false} showMapEmbed={false} />
 
       {/* 5 — Accommodation */}
       <section className="py-12 px-4" style={{ backgroundColor: "#FFF0E0" }}>
