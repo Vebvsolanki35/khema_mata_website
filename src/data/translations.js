@@ -212,10 +212,6 @@ const translations = {
       subtitle: "माँ खेमज की सेवा में योगदान दें",
       bankSectionTitle: "बैंक खाते से दान करें",
       upiTitle: "UPI से दान करें",
-      upiIds: [
-        { label: "PhonePe / Google Pay", id: "kheemajmata.dei@upi" },
-        { label: "Paytm", id: "temple.dei.bundi@paytm" },
-      ],
       copyBtn: "कॉपी करें",
       copied: "कॉपी हो गया!",
       amountTitle: "दान राशि चुनें",
@@ -552,10 +548,6 @@ const translations = {
       subtitle: "Contribute to the service of Maa Khemaj",
       bankSectionTitle: "Donate via Bank Account",
       upiTitle: "Donate via UPI",
-      upiIds: [
-        { label: "PhonePe / Google Pay", id: "kheemajmata.dei@upi" },
-        { label: "Paytm", id: "temple.dei.bundi@paytm" },
-      ],
       copyBtn: "Copy",
       copied: "Copied!",
       amountTitle: "Choose Amount",
@@ -894,10 +886,6 @@ const translations = {
       subtitle: "માં ખેમજની સેવામાં ફાળો આપો",
       bankSectionTitle: "બેંક ખાતા દ્વારા દાન કરો",
       upiTitle: "UPI થી દાન",
-      upiIds: [
-        { label: "PhonePe / Google Pay", id: "kheemajmata.dei@upi" },
-        { label: "Paytm", id: "temple.dei.bundi@paytm" },
-      ],
       copyBtn: "કૉપી કરો",
       copied: "કૉપી થઈ ગયું!",
       amountTitle: "રકમ પસંદ કરો",

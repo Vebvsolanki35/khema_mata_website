@@ -22,27 +22,20 @@
 /**
  * UPI IDs shown on the donation page.
  *
- * The first entry is the real one, DECODED FROM THE CARD'S QR. The other two
- * were already live on the site before this work; they could not be verified
- * against any document supplied so far, so they remain flagged "pending
- * confirmation" rather than being deleted (no working payment route is removed
- * without approval). Please confirm whether they are real or should be dropped.
+ * Only the QR-verified ID is listed. It was DECODED FROM THE CARD'S QR, so it
+ * is the payment route actually printed on the trust's own bank card.
+ *
+ * Two older IDs used to be listed here — kheemajmata.dei@upi (PhonePe /
+ * Google Pay) and temple.dei.bundi@paytm (Paytm). They were removed on your
+ * instruction on 18 Oct 2026: they could not be verified against any document
+ * supplied, and publishing an unverified payment ID risks donors sending money
+ * to the wrong account.
  */
 export const UPI_IDS = [
   {
     label: "ICICI Bank • UPI (QR-verified)",
     id: "MSSHRIMANDIRSHRIKHEVAJMATAJIKSHEMKARIKULDEVISOLANKIRAJPUTSAMAJTRUST.eazypay@icici",
     verified: true,
-  },
-  {
-    label: "PhonePe / Google Pay",
-    id: "kheemajmata.dei@upi",
-    verified: false,
-  },
-  {
-    label: "Paytm",
-    id: "temple.dei.bundi@paytm",
-    verified: false,
   },
 ];
 
@@ -97,7 +90,6 @@ export const DONATION_QR = {
 export const PENDING_CONFIRMATION = [
   'Account-holder spelling: the card prints "SHRIMANDIR" as one word — I render it as "SHRI MANDIR".',
   'Branch is printed as "DEI" — confirm the full branch name if you want it expanded.',
-  "Are the two older UPI IDs (kheemajmata.dei@upi, temple.dei.bundi@paytm) real, or should they be removed?",
 ];
 
 export default { UPI_IDS, BANK_DETAILS, DONATION_QR, PENDING_CONFIRMATION };
