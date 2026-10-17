@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import TabNotices from "../components/admin/TabNotices";
+import BroadcastCenter from "../components/admin/BroadcastCenter";
 import TabVolunteers from "../components/admin/TabVolunteers";
 
 function AdminLogin() {
@@ -422,7 +422,7 @@ const TABS = [
   { id: "whatsapp", label: "💬 WhatsApp ग्रुप" },
   { id: "gallery", label: "🖼️ गैलरी" },
   { id: "content", label: "⚙️ सामग्री" },
-  { id: "notices", label: "📌 लाइव सूचनाएं" },
+  { id: "notices", label: "📻 प्रसारण केंद्र" },
   { id: "volunteers", label: "🙋 सेवा आवेदन" },
 ];
 
@@ -467,7 +467,7 @@ function AdminDashboard() {
         {activeTab === "whatsapp" && <TabWhatsApp />}
         {activeTab === "gallery" && <TabGallery />}
         {activeTab === "content" && <TabContent />}
-        {activeTab === "notices" && <TabNotices />}
+        {activeTab === "notices" && <BroadcastCenter />}
         {activeTab === "volunteers" && <TabVolunteers />}
       </section>
     </main>
