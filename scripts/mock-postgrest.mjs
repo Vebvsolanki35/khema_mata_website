@@ -254,7 +254,39 @@ export function createMockSupabase({ latencyMs = 0 } = {}) {
     }
   });
 
+  /** Seeds the two durable shapes this project has used, so the same dataset can
+   *  be replayed by the pre-optimisation code (one encrypted document) and by the
+   *  current code (one row per registration). */
+  function seedRegistrations(records, { legacyDocument = true } = {}) {
+    for (const record of records) {
+      registrations.push(record);
+      counters.set(
+        String(record.village_code || ""),
+        Math.max(counters.get(String(record.village_code || "")) || 0, Number(String(record.family_id || "").split("-")[1]) || 0)
+      );
+      kv.set(`parivaar_reg_v1:${record.id}`, {
+        key: `parivaar_reg_v1:${record.id}`,
+        value: JSON.stringify({ v: 2, ...record }),
+      });
+    }
+    if (legacyDocument) {
+      kv.set("parivaar_pg_store_v1", {
+        key: "parivaar_pg_store_v1",
+        value: JSON.stringify({
+          version: 1,
+          updated_at: new Date().toISOString(),
+          deleted_ids: [],
+          registrations: records,
+          counters: [...counters].map(([village_code, last_seq]) => ({ village_code, last_seq })),
+          audit_logs: [],
+          missing_reports: [],
+        }),
+      });
+    }
+  }
+
   return {
+    seedRegistrations,
     metrics,
     kv,
     storage,

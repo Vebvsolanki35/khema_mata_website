@@ -67,27 +67,7 @@ function makeFixture(index, village = "94494", district = "94", subdistrict = "6
 
 function seedMock(mock, count) {
   const fixtures = Array.from({ length: count }, (_, i) => makeFixture(i));
-  // Legacy single-document architecture (pre-optimisation) so a benchmark run
-  // against old code hydrates the same dataset.
-  mock.kv.set("parivaar_pg_store_v1", {
-    key: "parivaar_pg_store_v1",
-    value: JSON.stringify({
-      version: 1,
-      updated_at: new Date().toISOString(),
-      deleted_ids: [],
-      registrations: fixtures.map((r) => ({ ...r, admin_note: null })),
-      counters: [],
-      audit_logs: [],
-      missing_location_reports: [],
-    }),
-  });
-  // Current per-record architecture.
-  for (const row of fixtures) {
-    mock.kv.set(`parivaar_reg_v1:${row.id}`, {
-      key: `parivaar_reg_v1:${row.id}`,
-      value: JSON.stringify({ v: 2, ...row }),
-    });
-  }
+  mock.seedRegistrations(fixtures);
   mock.kv.set("parivaar_rev_v1", {
     key: "parivaar_rev_v1",
     value: JSON.stringify({
@@ -100,11 +80,9 @@ function seedMock(mock, count) {
     key: "parivaar_store_v2",
     value: JSON.stringify({ migrated_at: new Date().toISOString(), count: fixtures.length }),
   });
-  for (const row of fixtures) mock.registrations.push({ ...row });
   return fixtures;
 }
 
-/** Converts a seeded fixture into a registration request body. */
 function toRegisterPayload(fixture, idempotencyKey) {
   const payload = { ...fixture, idempotency_key: idempotencyKey };
   delete payload.id;

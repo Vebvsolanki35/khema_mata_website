@@ -126,23 +126,25 @@ same harness; "after" is this branch.
 
 | Metric | Before | After |
 |---|---|---|
-| Cold start — official location data ready | 4,549.8 ms | **186.7 ms** |
-| Cold start — first summary response | 199.8 ms | 524.1 ms (7 DB requests vs 2) |
-| `summary` p50 / p95 | 4.1 / 4.6 ms | 4.1 / 4.4 ms |
+| Cold start — official location data ready | 4,549.8 ms | **216.2 ms** |
+| Cold start — first summary response | 199.8 ms | 478.5 ms (7 DB requests vs 2) |
+| `summary` p50 / p95 | 4.1 / 4.6 ms | 3.9 / 3.9 ms |
 | `directory` p50 | 7.0 ms | 7.3 ms |
-| `map-aggregates` p50 | 57.2 ms | **30.2 ms** |
+| `map-aggregates` p50 | 57.2 ms | **30.7 ms** |
 | `public-families` p50 | 7.2 ms | 7.7 ms |
 | LGD `villages` page p50 | 1.4 ms | **0.1 ms** |
 | Idle poll (browser, every 7 s) | 8.6 ms, **0 DB requests** (never checks) | 49.3 ms, 1 DB request (checks) |
-| Registration p50 / p95 | 658.2 / 684.5 ms | **135.8 / 141.4 ms** |
-| 5 concurrent registrations (wall) | 2,196.2 ms | **161.7 ms** |
+| Registration p50 / p95 | 658.2 / 684.5 ms | **139.4 / 148.4 ms** |
+| 5 concurrent registrations (wall) | 2,196.2 ms | **186.0 ms** |
 | Database requests per registration | 6 | **3** |
 | Retry of the same submission | `409 DUPLICATE_REGISTRATION` | **`201`, same Family ID** |
-| New family visible on the second device | 4,973 ms | **654 ms** |
+| New family visible on the second device | 4,973 ms | **755 ms** |
 | Registration while the database is down | **`201` (reported success)** | **`503 PERSISTENCE_FAILED`** |
 
 At 200 registrations the same harness reports registration p50 308.2 → 135.8 ms
-and cold start 4,166.8 → 184.9 ms.
+and cold start 4,166.8 → 184.9 ms; at 2,000 registrations the old write path
+already moved 3.4 MB per registration while the new one moves ~2 KB, so the gap
+widens as the directory grows.
 
 **Reading the numbers honestly**
 
@@ -154,7 +156,7 @@ and cold start 4,166.8 → 184.9 ms.
   before, because before they were allowed to be 4 s stale — that is exactly the
   bug that made a new family invisible. The 7 s poll costs ~50 ms of server time
   and never re-fetches the 153k location records.
-* The first summary after a cold start is slower (524 ms) because it now hydrates
+* The first summary after a cold start is slower (478 ms) because it now hydrates
   per-record rows and reconciles against the database aggregate instead of
   replaying one blob. Total cold-start-to-first-answer is still ~2.7× faster
   because the 4.5 s reference-data import is gone.
