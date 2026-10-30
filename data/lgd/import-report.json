@@ -1,0 +1,39 @@
+{
+  "dataset_source": "Official Local Government Directory (https://lgdirectory.gov.in/)",
+  "import_timestamp": "2026-10-26T08:39:23.399Z",
+  "import_status": "completed",
+  "is_test_run": false,
+  "inserted_count": 168013,
+  "updated_count": 0,
+  "skipped_count": 0,
+  "invalid_count": 0,
+  "by_level": {
+    "states": {
+      "inserted": 36,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 0
+    },
+    "districts": {
+      "inserted": 763,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 0
+    },
+    "subdistricts_blocks": {
+      "inserted": 14144,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 0
+    },
+    "villages": {
+      "inserted": 153070,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 0,
+      "verified_coords": 125758,
+      "unverified_coords": 27312
+    }
+  },
+  "error_summary": []
+}

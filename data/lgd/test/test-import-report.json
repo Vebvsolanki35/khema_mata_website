@@ -1,0 +1,70 @@
+{
+  "dataset_source": "LGD Test Dataset (data/lgd/test)",
+  "import_timestamp": "2026-10-26T08:39:22.363Z",
+  "import_status": "test_passed",
+  "is_test_run": true,
+  "inserted_count": 16,
+  "updated_count": 0,
+  "skipped_count": 2,
+  "invalid_count": 5,
+  "by_level": {
+    "states": {
+      "inserted": 2,
+      "updated": 0,
+      "skipped": 1,
+      "invalid": 1
+    },
+    "districts": {
+      "inserted": 3,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 1
+    },
+    "subdistricts_blocks": {
+      "inserted": 6,
+      "updated": 0,
+      "skipped": 0,
+      "invalid": 1
+    },
+    "villages": {
+      "inserted": 5,
+      "updated": 0,
+      "skipped": 1,
+      "invalid": 2,
+      "verified_coords": 4,
+      "unverified_coords": 1
+    }
+  },
+  "error_summary": [
+    {
+      "level": "states",
+      "line": 5,
+      "code": "",
+      "reason": "Missing state_code or name_en"
+    },
+    {
+      "level": "districts",
+      "line": 5,
+      "code": "9999",
+      "reason": "Parent state_code '99' does not exist in states table"
+    },
+    {
+      "level": "subdistricts_blocks",
+      "line": 8,
+      "code": "8888",
+      "reason": "Parent district_code '9999' does not exist in districts table"
+    },
+    {
+      "level": "villages",
+      "line": 8,
+      "code": "77777",
+      "reason": "Parent subdistrict_code '8888' does not exist in subdistricts_blocks table"
+    },
+    {
+      "level": "villages",
+      "line": 9,
+      "code": "77778",
+      "reason": "Coordinates (85, 190) are outside India's geographic bounding box (Lat 6..38, Lng 68..98)."
+    }
+  ]
+}

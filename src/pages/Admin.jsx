@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import BroadcastCenter from "../components/admin/BroadcastCenter";
 import TabVolunteers from "../components/admin/TabVolunteers";
+import TabParivaar from "../components/admin/TabParivaar";
 
 function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -424,6 +425,7 @@ const TABS = [
   { id: "content", label: "⚙️ सामग्री" },
   { id: "notices", label: "📻 प्रसारण केंद्र" },
   { id: "volunteers", label: "🙋 सेवा आवेदन" },
+  { id: "parivaar", label: "👨‍👩‍👧‍👦 परिवार निर्देशिका" },
 ];
 
 function AdminDashboard() {
@@ -469,6 +471,7 @@ function AdminDashboard() {
         {activeTab === "content" && <TabContent />}
         {activeTab === "notices" && <BroadcastCenter />}
         {activeTab === "volunteers" && <TabVolunteers />}
+        {activeTab === "parivaar" && <TabParivaar />}
       </section>
     </main>
   );

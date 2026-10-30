@@ -1,0 +1,9 @@
+village_code,subdistrict_code,block_code,district_code,state_code,name_en,name_local,census_2011_code,latitude,longitude,coord_source,coord_verified,source
+93963,623,BLK-638,94,8,Dei,देई,093963,25.6774,75.9397,Shri Khemaj Mata Temple Trust / LGD Verified GPS,true,LGD (lgdirectory.gov.in)
+93962,623,BLK-638,94,8,Gurhadeoji,,093962,25.727959,75.93989,LGD + Census 2011 GIS Verified Coordinates,true,LGD (lgdirectory.gov.in)
+94556,6033,BLK-639,94,8,Talera (CT),तालेड़ा,094556,25.316273,75.738896,LGD + Census 2011 GIS Verified Coordinates,true,LGD (lgdirectory.gov.in)
+94466,6033,BLK-639,94,8,Aktasa,,094466,25.320255,75.72128,LGD + Census 2011 GIS Verified Coordinates,true,LGD (lgdirectory.gov.in)
+94390,626,,94,8,Ajeta,,094390,,,,false,LGD (lgdirectory.gov.in)
+93963,623,BLK-638,94,8,Dei,देई,093963,25.6774,75.9397,Shri Khemaj Mata Temple Trust / LGD Verified GPS,true,LGD (lgdirectory.gov.in)
+77777,8888,,94,8,OrphanVillage,,,,,,false,LGD
+77778,623,,94,8,BadCoordsVillage,,,85.000,190.000,InvalidSource,true,LGD
