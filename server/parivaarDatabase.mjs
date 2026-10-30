@@ -294,6 +294,9 @@ export function initParivaarSchema(db) {
   if (!regCols.some((c) => c.name === "father_name")) {
     db.exec("ALTER TABLE parivaar_registrations ADD COLUMN father_name TEXT");
   }
+  if (!regCols.some((c) => c.name === "idempotency_key")) {
+    db.exec("ALTER TABLE parivaar_registrations ADD COLUMN idempotency_key TEXT");
+  }
 
   db.exec(`
     DROP INDEX IF EXISTS parivaar_registrations_dedup_idx;
@@ -305,6 +308,24 @@ export function initParivaarSchema(db) {
       ON parivaar_registrations (lower(full_name));
     CREATE INDEX IF NOT EXISTS parivaar_reg_father_name_idx
       ON parivaar_registrations (lower(father_name));
+
+    -- Composite indexes that match the live aggregate / directory query shapes
+    -- (status = 'approved' combined with a geographic parent code).
+    CREATE INDEX IF NOT EXISTS parivaar_reg_status_village_idx
+      ON parivaar_registrations (status, village_code);
+    CREATE INDEX IF NOT EXISTS parivaar_reg_status_district_idx
+      ON parivaar_registrations (status, district_code);
+    CREATE INDEX IF NOT EXISTS parivaar_reg_status_subdistrict_idx
+      ON parivaar_registrations (status, subdistrict_code);
+    CREATE INDEX IF NOT EXISTS parivaar_reg_status_state_idx
+      ON parivaar_registrations (status, state_code);
+    CREATE INDEX IF NOT EXISTS parivaar_reg_created_idx
+      ON parivaar_registrations (created_at DESC);
+
+    -- Idempotency: a retried submission can never create a second family.
+    CREATE UNIQUE INDEX IF NOT EXISTS parivaar_reg_idempotency_uidx
+      ON parivaar_registrations (idempotency_key)
+      WHERE idempotency_key IS NOT NULL AND idempotency_key <> '';
   `);
 
   // Backfill any existing registrations that do not yet have a permanent family_id
@@ -396,6 +417,25 @@ let cachedDb = null;
 let cachedDbPath = null;
 
 /**
+ * Indexes that are created by `initParivaarSchema`.  They are dropped during a
+ * full LGD bulk import and recreated afterwards: maintaining five B-tree
+ * indexes for 153,070 inserts costs far more than building them once at the end.
+ */
+const LGD_SEED_INDEXES = [
+  "states_name_en_idx",
+  "districts_state_code_idx",
+  "districts_name_en_idx",
+  "subdistricts_district_code_idx",
+  "subdistricts_state_code_idx",
+  "subdistricts_name_en_idx",
+  "villages_subdistrict_code_idx",
+  "villages_block_code_idx",
+  "villages_district_code_idx",
+  "villages_state_code_idx",
+  "villages_name_en_idx",
+];
+
+/**
  * Seeds the SQLite database from `data/lgd/` if `states` or `villages` have not yet been imported.
  */
 export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
@@ -411,6 +451,20 @@ export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
   }
 
   const now = new Date().toISOString();
+  const isFreshDatabase =
+    Number(db.prepare("SELECT COUNT(*) AS cnt FROM villages").get()?.cnt || 0) === 0;
+
+  if (isFreshDatabase) {
+    // Bulk-load tuning for trusted, immutable official reference data:
+    // no per-row journal flush, no per-row index maintenance, and no per-row
+    // foreign-key probe (the parent rows are inserted in hierarchy order).
+    db.exec(
+      "PRAGMA journal_mode = MEMORY; PRAGMA synchronous = OFF; PRAGMA foreign_keys = OFF; PRAGMA cache_size = -65536;"
+    );
+    for (const indexName of LGD_SEED_INDEXES) {
+      db.exec(`DROP INDEX IF EXISTS ${indexName}`);
+    }
+  }
 
   db.exec("BEGIN");
   try {
@@ -520,10 +574,9 @@ export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
     const headerCols = parseCsvLineFast(villageLines[0]).map((h) => h.toLowerCase());
     const hasBlockCol = headerCols.includes("block_code");
 
-    const upsertVillage = db.prepare(`
-      INSERT INTO villages (village_code, subdistrict_code, block_code, district_code, state_code, name_en, name_local, census_2011_code, latitude, longitude, coord_source, coord_verified, source, last_updated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(village_code) DO UPDATE SET
+    const villageInsertSql = `INSERT INTO villages (village_code, subdistrict_code, block_code, district_code, state_code, name_en, name_local, census_2011_code, latitude, longitude, coord_source, coord_verified, source, last_updated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const villageUpsertClause = `ON CONFLICT(village_code) DO UPDATE SET
         subdistrict_code = excluded.subdistrict_code,
         block_code = excluded.block_code,
         district_code = excluded.district_code,
@@ -536,8 +589,14 @@ export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
         coord_source = excluded.coord_source,
         coord_verified = excluded.coord_verified,
         source = excluded.source,
-        last_updated = excluded.last_updated
-    `);
+        last_updated = excluded.last_updated`;
+    // A fresh container imports into an empty table, so the plain INSERT is
+    // enough and avoids a redundant primary-key conflict probe per row.
+    const upsertVillage = db.prepare(
+      isFreshDatabase
+        ? villageInsertSql
+        : `${villageInsertSql} ${villageUpsertClause}`
+    );
 
     for (let i = 1; i < villageLines.length; i++) {
       const c = parseCsvLineFast(villageLines[i]);
@@ -599,6 +658,37 @@ export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
     }
 
     db.exec("COMMIT");
+
+    let foreignKeyViolations = 0;
+    if (isFreshDatabase) {
+      try {
+        const violations = db.prepare("PRAGMA foreign_key_check").all();
+        foreignKeyViolations = Array.isArray(violations) ? violations.length : 0;
+      } catch {
+        foreignKeyViolations = 0;
+      }
+      db.exec("PRAGMA foreign_keys = ON;");
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS states_name_en_idx ON states (name_en COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS districts_state_code_idx ON districts (state_code);
+        CREATE INDEX IF NOT EXISTS districts_name_en_idx ON districts (name_en COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS subdistricts_district_code_idx ON subdistricts_blocks (district_code);
+        CREATE INDEX IF NOT EXISTS subdistricts_state_code_idx ON subdistricts_blocks (state_code);
+        CREATE INDEX IF NOT EXISTS subdistricts_name_en_idx ON subdistricts_blocks (name_en COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS villages_subdistrict_code_idx ON villages (subdistrict_code);
+        CREATE INDEX IF NOT EXISTS villages_block_code_idx ON villages (block_code);
+        CREATE INDEX IF NOT EXISTS villages_district_code_idx ON villages (district_code);
+        CREATE INDEX IF NOT EXISTS villages_state_code_idx ON villages (state_code);
+        CREATE INDEX IF NOT EXISTS villages_name_en_idx ON villages (name_en COLLATE NOCASE);
+      `);
+      db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+      try {
+        db.exec("ANALYZE");
+      } catch {
+        /* statistics are an optimisation only */
+      }
+    }
+
     return {
       imported: true,
       counts: {
@@ -607,10 +697,56 @@ export function seedLgdIntoSqlite(db, lgdDir = path.join(ROOT, "data", "lgd")) {
         subdistricts_blocks: totalSubdistricts,
         villages: totalVillages,
       },
+      foreign_key_violations: foreignKeyViolations,
     };
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
+  }
+}
+
+const PREBUILT_LGD_PATH = path.join(
+  ROOT,
+  "data",
+  "lgd",
+  "lgd_locations.sqlite.gz"
+);
+
+/**
+ * Restores the pre-built immutable LGD reference database into the container's
+ * writable directory.  Measured at ~160 ms versus ~1,570 ms for a CSV import
+ * (and ~4,700 ms before the import itself was optimised).
+ */
+export function restorePrebuiltLgdDatabase(
+  dbPath,
+  gzPath = PREBUILT_LGD_PATH
+) {
+  if (!fs.existsSync(gzPath)) return { restored: false, reason: "missing" };
+  const startedAt = performance.now();
+  const temporaryPath = `${dbPath}.restore-${process.pid}`;
+  try {
+    const raw = zlib.gunzipSync(fs.readFileSync(gzPath));
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    fs.writeFileSync(temporaryPath, raw);
+    fs.renameSync(temporaryPath, dbPath);
+    try {
+      fs.rmSync(`${dbPath}-wal`, { force: true });
+      fs.rmSync(`${dbPath}-shm`, { force: true });
+    } catch {
+      /* no stale WAL files */
+    }
+    return {
+      restored: true,
+      milliseconds: Math.round(performance.now() - startedAt),
+      bytes: raw.length,
+    };
+  } catch (err) {
+    try {
+      fs.rmSync(temporaryPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+    return { restored: false, reason: err?.message || "restore failed" };
   }
 }
 
@@ -619,6 +755,13 @@ export function getParivaarDb(customPath = null) {
   if (cachedDb && cachedDbPath === dbPath) {
     return cachedDb;
   }
+
+  // Cold start fast path: copy the pre-built LGD reference database instead of
+  // re-importing 167k reference rows.  Registrations are never part of it.
+  if (!customPath && !fs.existsSync(dbPath)) {
+    restorePrebuiltLgdDatabase(dbPath);
+  }
+
   const db = new DatabaseSync(dbPath);
   initParivaarSchema(db);
 
@@ -1714,7 +1857,11 @@ export function verifyParivaarDataConsistency(db = getParivaarDb()) {
  * Validated Server-Side Registration Submission into `parivaar_registrations`
  * with transaction-safe `LGD_VILLAGE_CODE-SEQUENCE` Family ID generation.
  */
-export function insertParivaarRegistration(payload, db = getParivaarDb()) {
+export function insertParivaarRegistration(
+  payload,
+  db = getParivaarDb(),
+  options = {}
+) {
   const fullName = String(
     payload?.full_name ?? payload?.head_name ?? ""
   ).trim();
@@ -1756,6 +1903,15 @@ export function insertParivaarRegistration(payload, db = getParivaarDb()) {
   )
     ? String(payload.public_visibility)
     : "default";
+
+  // Idempotency key: lets a retried/timed-out submission resolve to the SAME
+  // saved family instead of creating a duplicate row.
+  const rawIdempotencyKey = String(
+    payload?.idempotency_key ?? payload?.idempotencyKey ?? ""
+  ).trim();
+  const idempotencyKey = /^[A-Za-z0-9:_-]{8,128}$/.test(rawIdempotencyKey)
+    ? rawIdempotencyKey
+    : null;
 
   if (phone.length === 12 && phone.startsWith("91")) phone = phone.slice(2);
   else if (phone.length === 11 && phone.startsWith("0")) phone = phone.slice(1);
@@ -1973,6 +2129,68 @@ export function insertParivaarRegistration(payload, db = getParivaarDb()) {
     };
   }
 
+  // Dry run: pure server-side validation (no writes), used by the
+  // PostgreSQL-first registration flow so bad input never reaches the database.
+  if (options?.dryRun) {
+    return {
+      ok: true,
+      dry_run: true,
+      normalized: {
+        fullName,
+        fatherName,
+        memberCount: parsedMembers,
+        stateCode,
+        districtCode,
+        subdistrictCode,
+        villageCode,
+        thikana: finalThikana,
+        thikanaSameAsVillage: sameAsVillage,
+        currentAddress,
+        phone,
+        publicVisibility,
+        consentGiven,
+        idempotencyKey,
+        stateName: stateRow.name_en,
+        districtName: distRow.name_en,
+        subdistrictName: subRow.name_en,
+        adminType: subRow.admin_type || "Tehsil",
+        villageName: officialVillageRow
+          ? String(officialVillageRow.name_en || "").trim()
+          : finalThikana,
+      },
+    };
+  }
+
+  // Idempotent replay: the exact same submission was already committed.
+  if (idempotencyKey) {
+    const existingByKey = db
+      .prepare(
+        `SELECT id, family_id, full_name, father_name, member_count, state_code,
+                district_code, subdistrict_code, village_code, thikana,
+                thikana_same_as_village, created_at
+         FROM parivaar_registrations WHERE idempotency_key = ? LIMIT 1`
+      )
+      .get(idempotencyKey);
+    if (existingByKey) {
+      return {
+        ok: true,
+        id: existingByKey.id,
+        family_id: existingByKey.family_id,
+        idempotent_replay: true,
+        created_at: existingByKey.created_at,
+        registration: {
+          ...existingByKey,
+          state_name: stateRow.name_en,
+          district_name: distRow.name_en,
+          subdistrict_name: subRow.name_en,
+          village_name: officialVillageRow
+            ? officialVillageRow.name_en
+            : existingByKey.thikana,
+        },
+      };
+    }
+  }
+
   // Execute duplicate check + sequence allocation + registration insert inside an atomic IMMEDIATE transaction
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -2117,8 +2335,9 @@ export function insertParivaarRegistration(payload, db = getParivaarDb()) {
          id, family_id, full_name, father_name, member_count,
          state_code, district_code, subdistrict_code, village_code,
          thikana, thikana_same_as_village, current_address, phone_number,
-         consent_given, public_opt_in, public_visibility, status, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, 'approved', ?, ?)`
+         consent_given, public_opt_in, public_visibility, status, created_at, updated_at,
+         idempotency_key
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, 'approved', ?, ?, ?)`
     ).run(
       id,
       familyId,
@@ -2135,7 +2354,8 @@ export function insertParivaarRegistration(payload, db = getParivaarDb()) {
       phone,
       publicVisibility,
       createdAt,
-      createdAt
+      createdAt,
+      idempotencyKey
     );
 
     db.prepare(
@@ -2206,6 +2426,232 @@ export function insertParivaarRegistration(payload, db = getParivaarDb()) {
     }
     throw err;
   }
+}
+
+/**
+ * Mirrors a registration that PostgreSQL has already committed into the local
+ * SQLite replica, using the database-issued `id` / `family_id` as the source of
+ * truth (the Family ID is never generated in the browser or by COUNT(*)).
+ *
+ * If the same family already exists locally under a different internal id
+ * (for example the verified baseline row), the existing row is updated instead
+ * of being duplicated, so totals never double count.
+ */
+export function applyPostgresRegistrationToReplica(
+  db,
+  postgresRecord,
+  normalized = {},
+  { idempotencyKey = null } = {}
+) {
+  if (!db || !postgresRecord?.family_id) {
+    return { ok: false, code: "REPLICA_WRITE_FAILED" };
+  }
+
+  const now = new Date().toISOString();
+  const row = {
+    id: String(postgresRecord.id || crypto.randomUUID()),
+    family_id: String(postgresRecord.family_id),
+    full_name: String(postgresRecord.full_name || normalized.fullName || "").trim(),
+    father_name:
+      String(postgresRecord.father_name || normalized.fatherName || "").trim() || null,
+    member_count: Math.max(
+      1,
+      Number(postgresRecord.member_count || normalized.memberCount) || 1
+    ),
+    state_code: String(postgresRecord.state_code || normalized.stateCode || ""),
+    district_code: String(postgresRecord.district_code || normalized.districtCode || ""),
+    subdistrict_code: String(
+      postgresRecord.subdistrict_code || normalized.subdistrictCode || ""
+    ),
+    village_code: postgresRecord.village_code
+      ? String(postgresRecord.village_code)
+      : normalized.villageCode || null,
+    thikana: String(
+      postgresRecord.thikana || normalized.thikana || normalized.villageName || ""
+    ),
+    thikana_same_as_village:
+      (postgresRecord.thikana_same_as_village ??
+        normalized.thikanaSameAsVillage ??
+        true)
+        ? 1
+        : 0,
+    current_address: String(normalized.currentAddress || postgresRecord.current_address || ""),
+    phone_number: String(normalized.phone || postgresRecord.phone_number || ""),
+    public_visibility: String(
+      normalized.publicVisibility || postgresRecord.public_visibility || "default"
+    ),
+    status: String(postgresRecord.status || "approved"),
+    created_at: postgresRecord.created_at || now,
+    updated_at: now,
+    idempotency_key: idempotencyKey || null,
+  };
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const byId = db
+      .prepare("SELECT id FROM parivaar_registrations WHERE id = ? LIMIT 1")
+      .get(row.id);
+    const byFamilyId = byId
+      ? null
+      : db
+          .prepare(
+            "SELECT id FROM parivaar_registrations WHERE family_id = ? LIMIT 1"
+          )
+          .get(row.family_id);
+    const existing = byId || byFamilyId;
+
+    if (existing) {
+      db.prepare(
+        `UPDATE parivaar_registrations
+            SET family_id = ?,
+                full_name = ?,
+                father_name = ?,
+                member_count = ?,
+                state_code = ?,
+                district_code = ?,
+                subdistrict_code = ?,
+                village_code = ?,
+                thikana = ?,
+                thikana_same_as_village = ?,
+                current_address = ?,
+                phone_number = ?,
+                public_visibility = ?,
+                status = ?,
+                updated_at = ?,
+                idempotency_key = COALESCE(?, idempotency_key)
+          WHERE id = ?`
+      ).run(
+        row.family_id,
+        row.full_name,
+        row.father_name,
+        row.member_count,
+        row.state_code,
+        row.district_code,
+        row.subdistrict_code,
+        row.village_code,
+        row.thikana,
+        row.thikana_same_as_village,
+        row.current_address,
+        row.phone_number,
+        row.public_visibility,
+        row.status,
+        row.updated_at,
+        row.idempotency_key,
+        existing.id
+      );
+      row.id = existing.id;
+    } else {
+      db.prepare(
+        `INSERT INTO parivaar_registrations (
+           id, family_id, full_name, father_name, member_count,
+           state_code, district_code, subdistrict_code, village_code,
+           thikana, thikana_same_as_village, current_address, phone_number,
+           consent_given, public_opt_in, public_visibility, status,
+           created_at, updated_at, idempotency_key
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)`
+      ).run(
+        row.id,
+        row.family_id,
+        row.full_name,
+        row.father_name,
+        row.member_count,
+        row.state_code,
+        row.district_code,
+        row.subdistrict_code,
+        row.village_code,
+        row.thikana,
+        row.thikana_same_as_village,
+        row.current_address,
+        row.phone_number,
+        row.public_visibility,
+        row.status,
+        row.created_at,
+        row.updated_at,
+        row.idempotency_key
+      );
+
+      db.prepare(
+        `INSERT INTO registration_audit_log (
+           id, registration_id, family_id, action, changed_fields, previous_values, new_values, created_at
+         ) VALUES (?, ?, ?, 'created', '[]', '{}', ?, ?)`
+      ).run(
+        crypto.randomUUID(),
+        row.id,
+        row.family_id,
+        JSON.stringify({
+          family_id: row.family_id,
+          full_name: row.full_name,
+          father_name: row.father_name,
+          member_count: row.member_count,
+          village_code: row.village_code,
+          state_code: row.state_code,
+          district_code: row.district_code,
+          subdistrict_code: row.subdistrict_code,
+        }),
+        row.created_at
+      );
+    }
+
+    const seqMatch = String(row.family_id).match(/-(\d+)$/);
+    const seq = seqMatch ? Number(seqMatch[1]) || 0 : 0;
+    if (seq > 0 && row.village_code) {
+      db.prepare(
+        `INSERT INTO village_family_id_counters (village_code, last_seq, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(village_code) DO UPDATE SET
+           last_seq = MAX(village_family_id_counters.last_seq, excluded.last_seq),
+           updated_at = excluded.updated_at`
+      ).run(String(row.village_code), seq, row.updated_at);
+    }
+
+    db.exec("COMMIT");
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  }
+
+  const stateName = normalized.stateName || row.state_code;
+  const districtName = normalized.districtName || row.district_code;
+  const subdistrictName = normalized.subdistrictName || row.subdistrict_code;
+
+  return {
+    ok: true,
+    id: row.id,
+    family_id: row.family_id,
+    created_at: row.created_at,
+    updated: Boolean(
+      db.prepare("SELECT 1 AS x FROM parivaar_registrations WHERE id = ?").get(row.id)
+    ),
+    row,
+    registration: {
+      id: row.id,
+      family_id: row.family_id,
+      full_name: row.full_name,
+      head_name: row.full_name,
+      father_name: row.father_name,
+      member_count: row.member_count,
+      state_code: row.state_code,
+      state_name: stateName,
+      district_code: row.district_code,
+      district_name: districtName,
+      subdistrict_code: row.subdistrict_code,
+      subdistrict_name: subdistrictName,
+      admin_type: normalized.adminType || "Tehsil",
+      village_code: row.village_code,
+      village_name: normalized.villageName || row.thikana,
+      thikana: row.thikana,
+      thikana_same_as_village: Boolean(row.thikana_same_as_village),
+      current_address: row.current_address,
+      phone_number: row.phone_number,
+      public_visibility: row.public_visibility,
+      status: row.status,
+      created_at: row.created_at,
+    },
+  };
 }
 
 /**

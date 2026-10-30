@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { callSupabaseRpc, isSupabaseClientConfigured } from "../lib/supabase";
+import { isSupabaseClientConfigured } from "../lib/supabase";
 import {
   normalizeIndianPhone,
   validateMissingLocationReport,
@@ -26,6 +26,22 @@ const EMPTY_AGGREGATES = {
   subdistricts: [],
   villages: [],
 };
+
+// How often an open Family Directory checks for newly registered families.
+// Only registration-dependent data is refreshed; the 153k official LGD location
+// records are cached separately and are never polled.
+const LIVE_REFRESH_INTERVAL_MS = 7000;
+
+function createIdempotencyKey() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fall through */
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * Checks whether real Supabase credentials are configured in the client environment.
@@ -361,7 +377,21 @@ export function useParivaarDirectory() {
   const [submitError, setSubmitError] = useState(null);
   const [savedRegistration, setSavedRegistration] = useState(null);
   const [directoryRefreshTick, setDirectoryRefreshTick] = useState(0);
+  const [degraded, setDegraded] = useState(false);
+  const [dataWarning, setDataWarning] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const submitLockRef = useRef(false);
+  const idempotencyKeyRef = useRef(null);
+
+  // Live-sync bookkeeping
+  const revisionRef = useRef(null);
+  const inFlightRef = useRef(null);
+  const requestSeqRef = useRef(0);
+  const appliedSeqRef = useRef(0);
+  const failureCountRef = useRef(0);
+  const locationFilterRef = useRef({ stateCode: null, districtCode: null });
+  const mountedRef = useRef(true);
 
   const applyConsistentSnapshot = useCallback((snapshot) => {
     if (!snapshot || typeof snapshot !== "object") return;
@@ -390,35 +420,181 @@ export function useParivaarDirectory() {
     }
   }, []);
 
+  /**
+   * Loads overview statistics, map aggregates and public listings in ONE
+   * request, so the three sections can never disagree with each other.
+   *
+   * `silent` refreshes (polling / tab focus) never show a loading skeleton and
+   * never replace good data with zeros when the database hiccups.
+   */
   const loadStatsAndAggregates = useCallback(
-    (stateFilter = null, districtFilter = null) =>
-      Promise.resolve()
-        .then(async () => {
-          setLoadingStats(true);
-          const params = new URLSearchParams({ action: "map-aggregates" });
-          if (stateFilter) params.set("state_code", String(stateFilter).trim());
-          if (districtFilter) params.set("district_code", String(districtFilter).trim());
+    (stateFilter = null, districtFilter = null, options = {}) => {
+      const { silent = false, force = false } = options;
+      locationFilterRef.current = {
+        stateCode: stateFilter || null,
+        districtCode: districtFilter || null,
+      };
 
-          const data = await fetchJsonApi(`/api/parivaar?${params.toString()}`);
+      // De-duplicate concurrent requests instead of firing duplicates.
+      if (inFlightRef.current && !force) return inFlightRef.current;
+
+      const requestSeq = requestSeqRef.current + 1;
+      requestSeqRef.current = requestSeq;
+
+      const params = new URLSearchParams({ action: "map-aggregates" });
+      if (stateFilter) params.set("state_code", String(stateFilter).trim());
+      if (districtFilter) params.set("district_code", String(districtFilter).trim());
+      if (!force && revisionRef.current) {
+        params.set("revision", revisionRef.current);
+      }
+
+      const promise = Promise.resolve()
+        .then(() => {
+          if (!silent) setLoadingStats(true);
+          else setRefreshing(true);
+          return fetchJsonApi(`/api/parivaar?${params.toString()}`);
+        })
+        .then((data) => {
+          // Ignore responses that arrive out of order (a slower, older request
+          // must never overwrite newer server state).
+          if (requestSeq < appliedSeqRef.current) return data;
+          appliedSeqRef.current = requestSeq;
+
+          if (data?.unchanged) {
+            failureCountRef.current = 0;
+            if (mountedRef.current) {
+              setDbStatus("connected");
+              setDbError(null);
+              setDegraded(false);
+              setDataWarning(null);
+              setLastUpdatedAt(Date.now());
+            }
+            return data;
+          }
+
           applyConsistentSnapshot(data);
+          const nextRevision = data?.revision || null;
+          const changed = nextRevision !== revisionRef.current;
+          revisionRef.current = nextRevision;
 
-          setDbStatus("connected");
-          setDbError(null);
-          setLoadingStats(false);
+          failureCountRef.current = 0;
+          if (mountedRef.current) {
+            setDbStatus("connected");
+            setDbError(null);
+            setDegraded(Boolean(data?.degraded));
+            setDataWarning(data?.data_warning || null);
+            setLastUpdatedAt(Date.now());
+          }
+          // Ask the directory to re-read only when something actually changed.
+          if (changed) setDirectoryRefreshTick((n) => n + 1);
+          return data;
         })
         .catch((err) => {
-          setStats(EMPTY_STATS);
-          setAggregates(EMPTY_AGGREGATES);
-          setDbStatus("error");
-          setDbError(err?.message || "Unable to reach database.");
-          setLoadingStats(false);
-        }),
+          failureCountRef.current += 1;
+          if (mountedRef.current) {
+            // IMPORTANT: keep the last known good numbers and say what happened.
+            // An API failure is never rendered as "0 registrations".
+            setDbStatus(failureCountRef.current >= 2 ? "error" : "reconnecting");
+            setDbError(
+              err?.message ||
+                "Unable to reach the registration database. Showing the last verified data."
+            );
+            setDegraded(true);
+          }
+          throw err;
+        })
+        .finally(() => {
+          if (inFlightRef.current === promise) inFlightRef.current = null;
+          if (mountedRef.current) {
+            setLoadingStats(false);
+            setRefreshing(false);
+          }
+        })
+        // Callers that do not care about the failure (background refresh) must
+        // not produce unhandled rejections.
+        .catch(() => null);
+
+      inFlightRef.current = promise;
+      return promise;
+    },
     [applyConsistentSnapshot]
   );
 
   useEffect(() => {
     loadStatsAndAggregates();
   }, [loadStatsAndAggregates]);
+
+  /**
+   * Near-real-time synchronisation for visitors who keep the page open:
+   *  - refreshes registration-dependent data every 7s, but only while the tab
+   *    is visible;
+   *  - refreshes immediately when the tab regains focus or becomes visible;
+   *  - refreshes once when the browser comes back online.
+   * The official LGD location lists are never re-fetched here.
+   */
+  useEffect(() => {
+    mountedRef.current = true;
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    let timer = null;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      loadStatsAndAggregates(
+        locationFilterRef.current.stateCode,
+        locationFilterRef.current.districtCode,
+        { silent: true }
+      );
+    };
+
+    const startTimer = () => {
+      if (timer) return;
+      timer = setInterval(refreshIfVisible, LIVE_REFRESH_INTERVAL_MS);
+    };
+    const stopTimer = () => {
+      if (!timer) return;
+      clearInterval(timer);
+      timer = null;
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshIfVisible();
+        startTimer();
+      } else {
+        stopTimer();
+      }
+    };
+
+    const handleOnline = () => refreshIfVisible();
+
+    if (document.visibilityState === "visible") startTimer();
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      mountedRef.current = false;
+      stopTimer();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [loadStatsAndAggregates]);
+
+  const refreshNow = useCallback(
+    () =>
+      loadStatsAndAggregates(
+        locationFilterRef.current.stateCode,
+        locationFilterRef.current.districtCode,
+        { silent: true, force: true }
+      ),
+    [loadStatsAndAggregates]
+  );
 
   /**
    * Submits a family registration to the database via `/api/parivaar` (and syncs to Supabase RPC when configured).
@@ -467,53 +643,17 @@ export function useParivaarDirectory() {
           consent_given: true,
         };
 
+        // One idempotency key per attempt: a retry caused by a dropped
+        // connection resolves to the SAME saved family instead of a duplicate.
+        if (!idempotencyKeyRef.current) {
+          idempotencyKeyRef.current = createIdempotencyKey();
+        }
+        payload.idempotency_key = idempotencyKeyRef.current;
+
         const data = await fetchJsonApi("/api/parivaar?action=register", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-
-        // If Supabase is configured in the client environment and the server did not already
-        // persist to PostgreSQL, sync to the Supabase RPC using async/await (`callSupabaseRpc`).
-        if (isSupabaseConfigured() && !data?.pg_persisted) {
-          const rpcResult = await callSupabaseRpc(
-            "submit_parivaar_registration",
-            {
-              p_full_name: payload.full_name,
-              p_state_code: payload.state_code,
-              p_district_code: payload.district_code,
-              p_subdistrict_code: payload.subdistrict_code,
-              p_village_code: payload.village_code,
-              p_thikana: payload.thikana,
-              p_current_address: payload.current_address,
-              p_phone_number: payload.phone_number,
-              p_consent_given: payload.consent_given,
-              p_thikana_same_as_village: payload.thikana_same_as_village,
-              p_father_name: payload.father_name || null,
-              p_member_count: payload.member_count,
-              p_family_id: data?.family_id || null,
-            }
-          );
-
-          // If the extended 13-arg RPC signature hasn't been migrated yet, fall back to the 10-arg signature
-          if (
-            !rpcResult.ok &&
-            rpcResult.error &&
-            rpcResult.error.code !== "DUPLICATE_REGISTRATION"
-          ) {
-            await callSupabaseRpc("submit_parivaar_registration", {
-              p_full_name: payload.full_name,
-              p_state_code: payload.state_code,
-              p_district_code: payload.district_code,
-              p_subdistrict_code: payload.subdistrict_code,
-              p_village_code: payload.village_code,
-              p_thikana: payload.thikana,
-              p_current_address: payload.current_address,
-              p_phone_number: payload.phone_number,
-              p_consent_given: payload.consent_given,
-              p_thikana_same_as_village: payload.thikana_same_as_village,
-            });
-          }
-        }
 
         submitLockRef.current = false;
         setSubmitting(false);
@@ -527,30 +667,27 @@ export function useParivaarDirectory() {
           return { ok: false, error: errObj };
         }
 
-        if (data?.snapshot) {
-          applyConsistentSnapshot(data.snapshot);
-        }
-
-        setSavedRegistration(
-          data.registration || {
+        // The confirmation screen always shows the record the DATABASE saved —
+        // never a client-side reconstruction of the submitted form values.
+        if (data.registration) {
+          setSavedRegistration(data.registration);
+        } else {
+          setSavedRegistration({
             id: data.id,
             family_id: data.family_id,
-            full_name: payload.full_name,
-            father_name: payload.father_name,
-            member_count: payload.member_count,
-            state_code: payload.state_code,
-            district_code: payload.district_code,
-            subdistrict_code: payload.subdistrict_code,
-            village_code: payload.village_code,
-            village_name: villageName,
-            current_address: payload.current_address,
-            phone_number: payload.phone_number,
             created_at: data.created_at,
-          }
-        );
+          });
+        }
+
+        if (data.summary) {
+          applyConsistentSnapshot({ summary: data.summary });
+        }
+        if (data.revision) revisionRef.current = data.revision;
+
         setSubmitSuccess(true);
+        idempotencyKeyRef.current = null;
         setDirectoryRefreshTick((n) => n + 1);
-        await loadStatsAndAggregates();
+        await loadStatsAndAggregates(null, null, { silent: false, force: true });
         return {
           ok: true,
           id: data.id,
@@ -600,21 +737,8 @@ export function useParivaarDirectory() {
         body: JSON.stringify(payload),
       });
 
-      if (isSupabaseConfigured()) {
-        await callSupabaseRpc("submit_missing_location_report", {
-          p_reporter_name: payload.reporter_name,
-          p_reporter_phone: payload.reporter_phone,
-          p_state_code: payload.state_code,
-          p_district_code: payload.district_code,
-          p_subdistrict_code: payload.subdistrict_code,
-          p_missing_level: payload.missing_level,
-          p_proposed_name: payload.proposed_name,
-          p_parent_context: payload.parent_context,
-          p_pincode: payload.pincode,
-          p_notes: payload.notes,
-        });
-      }
-
+      // The server persists the report to PostgreSQL as part of this request,
+      // so no second write is issued from the browser.
       return { ok: true, id: data.id };
     } catch (err) {
       return {
@@ -640,9 +764,14 @@ export function useParivaarDirectory() {
     aggregates,
     publicFamilies,
     loadingStats,
+    refreshing,
     dbStatus,
     dbError,
+    degraded,
+    dataWarning,
+    lastUpdatedAt,
     reloadStats: loadStatsAndAggregates,
+    refreshNow,
     submitRegistration,
     submitMissingLocation,
     resetSubmission,

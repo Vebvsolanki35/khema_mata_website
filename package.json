@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build-lgd-sqlite.mjs --if-missing && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "lgd:test": "node scripts/import-lgd-locations.mjs --test",
     "lgd:import": "node scripts/import-lgd-locations.mjs --generate-bundle",
     "lgd:supabase": "node scripts/import-lgd-locations.mjs --supabase",
-    "test:parivaar": "node scripts/test-parivaar.mjs"
+    "test:parivaar": "node scripts/test-parivaar.mjs",
+    "lgd:build": "node scripts/build-lgd-sqlite.mjs",
+    "bench": "node scripts/bench-parivaar.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
