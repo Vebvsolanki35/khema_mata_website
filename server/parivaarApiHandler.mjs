@@ -8,6 +8,8 @@ import {
   queryPublicFamilies,
   querySummaryStats,
   queryMapAggregates,
+  queryParivaarConsistentSnapshot,
+  verifyParivaarDataConsistency,
   insertParivaarRegistration,
   insertMissingLocationReport,
   queryAdminParivaarData,
@@ -101,15 +103,29 @@ export async function handleParivaarApiRequest(req, res) {
 
       if (action === "directory") {
         await ensurePostgresHydrated(db);
-        const level = urlObj.searchParams.get("level") || "states";
+        const level = urlObj.searchParams.get("level") || "villages";
         const stateCode = urlObj.searchParams.get("state_code");
         const districtCode = urlObj.searchParams.get("district_code");
         const subdistrictCode = urlObj.searchParams.get("subdistrict_code");
+        const villageCode = urlObj.searchParams.get("village_code");
+        const onlyWithRegistrations =
+          urlObj.searchParams.get("only_with_registrations") === "1" ||
+          urlObj.searchParams.get("only_with_registrations") === "true";
         const q = urlObj.searchParams.get("q");
         const page = Number(urlObj.searchParams.get("page") || "1");
         const pageSize = Number(urlObj.searchParams.get("page_size") || "24");
         const result = queryDirectory(
-          { level, stateCode, districtCode, subdistrictCode, q, page, pageSize },
+          {
+            level,
+            stateCode,
+            districtCode,
+            subdistrictCode,
+            villageCode,
+            onlyWithRegistrations,
+            q,
+            page,
+            pageSize,
+          },
           db
         );
         return sendJson(res, 200, { ok: true, ...result });
@@ -141,9 +157,24 @@ export async function handleParivaarApiRequest(req, res) {
         await ensurePostgresHydrated(db);
         const stateCode = urlObj.searchParams.get("state_code");
         const districtCode = urlObj.searchParams.get("district_code");
-        const aggregates = queryMapAggregates({ stateCode, districtCode }, db);
-        const summary = querySummaryStats(db);
-        return sendJson(res, 200, { ok: true, aggregates, summary });
+        const snapshot = queryParivaarConsistentSnapshot(
+          { stateCode, districtCode, page: 1, pageSize: 100 },
+          db
+        );
+        const consistency = verifyParivaarDataConsistency(db);
+        return sendJson(res, 200, {
+          ok: true,
+          aggregates: snapshot.aggregates,
+          summary: snapshot.summary,
+          public_families: snapshot.public_families,
+          consistency,
+        });
+      }
+
+      if (action === "consistency") {
+        await ensurePostgresHydrated(db);
+        const consistency = verifyParivaarDataConsistency(db);
+        return sendJson(res, 200, { ok: true, ...consistency });
       }
 
       if (action === "admin-data") {
@@ -374,6 +405,10 @@ export async function handleParivaarApiRequest(req, res) {
         if (result.ok) {
           const pgSync = await persistRegistrationToPostgres(result, db);
           result.pg_persisted = Boolean(pgSync.pg_persisted);
+          result.snapshot = queryParivaarConsistentSnapshot(
+            { page: 1, pageSize: 100 },
+            db
+          );
         }
         const statusCode = result.ok ? 201 : result.code === "DUPLICATE_REGISTRATION" ? 409 : 400;
         return sendJson(res, statusCode, result);
