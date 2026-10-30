@@ -211,6 +211,7 @@ async function main() {
   // --- registration -------------------------------------------------------
   const registrationSamples = [];
   const perRegistrationDbRequests = [];
+  const perRegistrationBytes = [];
   const registrationStatuses = new Set();
   for (let i = 0; i < Math.min(5, ITERATIONS); i += 1) {
     const payload = toRegisterPayload(
@@ -226,12 +227,16 @@ async function main() {
     );
     registrationSamples.push(out.ms);
     perRegistrationDbRequests.push(mock.metrics.requests);
+    perRegistrationBytes.push(mock.metrics.bytesOut + mock.metrics.bytesIn);
     registrationStatuses.add(out.status);
   }
   const regP50 = round(percentile(registrationSamples, 50));
   const regP95 = round(percentile(registrationSamples, 95));
   const avgDbRequests = round(
     perRegistrationDbRequests.reduce((a, b) => a + b, 0) / perRegistrationDbRequests.length
+  );
+  const avgDbBytes = Math.round(
+    perRegistrationBytes.reduce((a, b) => a + b, 0) / perRegistrationBytes.length
   );
 
   // concurrent registrations
@@ -252,7 +257,9 @@ async function main() {
   for (const out of concurrentOut) registrationStatuses.add(out.status);
 
   console.log("\nregistration (ms)");
-  console.log(`  sequential p50 ${regP50} · p95 ${regP95} · ${avgDbRequests} DB requests per registration`);
+  console.log(
+    `  sequential p50 ${regP50} · p95 ${regP95} · ${avgDbRequests} DB requests and ${avgDbBytes} bytes per registration`
+  );
   console.log(`  ${PARALLEL} concurrent wall ${concurrentWall} ms · ${concurrentOk}/${PARALLEL} succeeded · http ${[...registrationStatuses].join("/")}`);
 
   // --- duplicate / idempotent replay --------------------------------------

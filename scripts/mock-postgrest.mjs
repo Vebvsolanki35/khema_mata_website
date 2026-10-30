@@ -60,6 +60,7 @@ export function createMockSupabase({ latencyMs = 0 } = {}) {
 
   const send = (res, status, body, headers = {}) => {
     const payload = body === null || body === undefined ? "" : JSON.stringify(body);
+    metrics.bytesOut += Buffer.byteLength(payload);
     res.writeHead(status, {
       "content-type": "application/json",
       ...headers,
@@ -74,6 +75,7 @@ export function createMockSupabase({ latencyMs = 0 } = {}) {
       if (body === undefined) {
         return send(res, 400, { statusCode: "404", error: "not_found", message: "Object not found" });
       }
+      metrics.bytesOut += Buffer.byteLength(body);
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(body);
     }
