@@ -1,20 +1,19 @@
--- =============================================================================
--- Parivaar performance indexes (ADDITIVE ONLY)
--- =============================================================================
--- These indexes match the exact query shapes used by the live endpoints:
---   * every public aggregate / directory query filters `status = 'approved'`
---     and then one geographic parent code;
---   * the public family listing orders by `family_id` and filters by village;
---   * the admin screen filters by status + created_at.
+-- Parivaar query indexes
+-- ---------------------------------------------------------------------------
+-- Additive only: no column is added, no row is modified, nothing is dropped.
+-- Every statement is idempotent, so running it twice is safe.
 --
--- Nothing here changes data, drops a column, or rewrites a table.  Every
--- statement is idempotent and safe to run on the existing production database.
--- =============================================================================
+-- The indexes mirror the filters the API actually sends:
+--   * the public directory / overview aggregate on status = 'approved' combined
+--     with one geographic parent code (state, district, tehsil or village);
+--   * the family listing is ordered by created_at for a given family id;
+--   * village lookups filter by district + tehsil.
+--
+-- Apply with the normal Supabase migration workflow. The application works
+-- without them (they only steer the query planner).
 
--- Rewrite the single-column partial indexes as composite indexes so the
--- planner can satisfy both predicates from one index.
-create index if not exists parivaar_reg_status_village_idx
-  on public.parivaar_registrations (status, village_code);
+create index if not exists parivaar_reg_status_state_idx
+  on public.parivaar_registrations (status, state_code);
 
 create index if not exists parivaar_reg_status_district_idx
   on public.parivaar_registrations (status, district_code);
@@ -22,24 +21,26 @@ create index if not exists parivaar_reg_status_district_idx
 create index if not exists parivaar_reg_status_subdistrict_idx
   on public.parivaar_registrations (status, subdistrict_code);
 
-create index if not exists parivaar_reg_status_state_idx
-  on public.parivaar_registrations (status, state_code);
+create index if not exists parivaar_reg_status_village_idx
+  on public.parivaar_registrations (status, village_code);
 
--- Directory ordering (`order by r.family_id asc, r.created_at desc`).
-create index if not exists parivaar_reg_family_created_idx
-  on public.parivaar_registrations (family_id asc, created_at desc);
+create index if not exists parivaar_reg_family_id_created_idx
+  on public.parivaar_registrations (family_id, created_at desc);
 
--- Map / village aggregation filtered by approval status.
-create index if not exists parivaar_reg_approved_village_idx
-  on public.parivaar_registrations (village_code, district_code, state_code)
+-- The public directory never exposes private rows, so the approved-public
+-- subset is a useful partial index for village level listings.
+create index if not exists parivaar_reg_public_village_idx
+  on public.parivaar_registrations (village_code, created_at desc)
   where status = 'approved';
 
--- Village lookups by hierarchy (state -> district -> subdistrict) already exist;
--- this one covers the `block_code` equivalence used by Talera Block filters.
-create index if not exists villages_block_subdistrict_idx
-  on public.villages (block_code, subdistrict_code)
-  where block_code is not null;
+-- Reference-data lookups used by the cascading State -> District -> Tehsil ->
+-- Village selectors (idempotent: the tables may already carry these indexes).
+create index if not exists villages_subdistrict_code_idx
+  on public.villages (subdistrict_code);
 
--- Keep table statistics fresh so the planner picks the new indexes.
+create index if not exists villages_block_code_idx
+  on public.villages (block_code);
+
+-- Keep planner statistics fresh for the newly indexed columns.
 analyze public.parivaar_registrations;
 analyze public.villages;

@@ -2437,6 +2437,23 @@ export function insertParivaarRegistration(
  * (for example the verified baseline row), the existing row is updated instead
  * of being duplicated, so totals never double count.
  */
+/**
+ * Deletes a registration from the local replica.  Used to undo a local commit
+ * when durable persistence could not be confirmed, so a device can never show
+ * or count a family that the database did not accept.
+ */
+export function removeReplicaRegistration(db, id) {
+  if (!db || !id) return { ok: false, removed: 0 };
+  try {
+    const info = db
+      .prepare("DELETE FROM parivaar_registrations WHERE id = ?")
+      .run(String(id));
+    return { ok: Number(info.changes) > 0, removed: Number(info.changes) };
+  } catch (err) {
+    return { ok: false, removed: 0, reason: err?.message || "delete failed" };
+  }
+}
+
 export function applyPostgresRegistrationToReplica(
   db,
   postgresRecord,

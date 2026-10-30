@@ -65,16 +65,26 @@ import {
 const ROOT = process.cwd();
 let passed = 0;
 
+/**
+ * Suites are executed strictly one after another: several of them mutate the
+ * shared replica (and the Supabase environment variables), so running them
+ * concurrently would produce races and misleading results.
+ */
+let suiteChain = Promise.resolve();
+
 function check(name, fn) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-    passed++;
-  } catch (err) {
-    console.error(`  ✕ FAILED: ${name}`);
-    console.error(`    ${err.stack || err.message}`);
-    process.exitCode = 1;
-  }
+  suiteChain = suiteChain.then(async () => {
+    try {
+      await fn();
+      console.log(`  ✓ ${name}`);
+      passed++;
+    } catch (err) {
+      console.error(`  ✕ FAILED: ${name}`);
+      console.error(`    ${err.stack || err.message}`);
+      process.exitCode = 1;
+    }
+  });
+  return suiteChain;
 }
 
 /**
@@ -1398,6 +1408,139 @@ check("10. [Performance & Real-Time Sync] Server-side validation dry-run, idempo
   }
 });
 
+check("11. [Durability] A failed database write never leaves a phantom family behind, and the LGD reference database ships registrations-free", async () => {
+  const { createParivaarRegistration } = await import("../server/parivaarRegistration.mjs");
+  const fsModule = await import("node:fs");
+  const zlib = await import("node:zlib");
+  const { DatabaseSync } = await import("node:sqlite");
+
+  const db = getParivaarDb();
+  cleanTestArtifacts(db, { keepBaseline: true });
+
+  const payload = {
+    full_name: "TEST_VERIFICATION_Phantom_Family",
+    father_name: "Phantom Father",
+    require_father_name: true,
+    member_count: 2,
+    state_code: "8",
+    district_code: "94",
+    subdistrict_code: "6033",
+    village_code: "94494",
+    thikana: "Chhapawda",
+    thikana_same_as_village: true,
+    require_village: true,
+    current_address: "Test address, Amritsar",
+    phone_number: "9812345699",
+    consent_given: true,
+    idempotency_key: `phantom-${Date.now()}`,
+  };
+
+  const rowsBefore = db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt;
+  const familiesBefore = queryPublicFamilies({ villageCode: "94494" }, db).total;
+
+  const previousUrl = process.env.SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_ANON_KEY;
+  const previousViteUrl = process.env.VITE_SUPABASE_URL;
+  const previousViteKey = process.env.VITE_SUPABASE_ANON_KEY;
+  // Point the store at a port that refuses connections: the RPC and the record
+  // write both fail, which is exactly the "database unreachable" case.
+  process.env.SUPABASE_URL = "http://127.0.0.1:1";
+  process.env.SUPABASE_ANON_KEY = "test-key";
+  delete process.env.VITE_SUPABASE_URL;
+  delete process.env.VITE_SUPABASE_ANON_KEY;
+
+  try {
+    const result = await createParivaarRegistration({ ...payload }, db);
+    assert.equal(result.ok, false, "A failed database write must never report success");
+    assert.equal(result.code, "PERSISTENCE_FAILED");
+    assert.equal(result.replica_rolled_back, true, "The local commit must be rolled back");
+    assert.ok(!result.family_id, "A failed write must not return a Family ID");
+    assert.ok(
+      !JSON.stringify(result).includes("9812345699"),
+      "A failed write must not echo the private phone number"
+    );
+
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt,
+      rowsBefore,
+      "No registration row may survive a failed database write"
+    );
+    assert.equal(
+      queryPublicFamilies({ villageCode: "94494" }, db).total,
+      familiesBefore,
+      "A failed write must not appear in the public directory"
+    );
+    assert.equal(
+      db
+        .prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations WHERE full_name LIKE 'TEST_VERIFICATION_Phantom%'")
+        .get().cnt,
+      0,
+      "The phantom family must not exist anywhere in the replica"
+    );
+
+    // The same request must succeed once the store is reachable again, which
+    // proves the rollback removed only the uncommitted row.
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_ANON_KEY;
+    const okKey = `phantom-ok-${Date.now()}`;
+    const localSave = await createParivaarRegistration(
+      { ...payload, idempotency_key: okKey },
+      db
+    );
+    assert.equal(localSave.ok, true, "Local-only mode (no store configured) must still save");
+    const replay = await createParivaarRegistration({ ...payload, idempotency_key: okKey }, db);
+    assert.equal(replay.ok, true, "A retried submission must resolve to the saved family");
+    assert.equal(replay.family_id, localSave.family_id, "A retry must never allocate a second Family ID");
+  } finally {
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+    else process.env.SUPABASE_ANON_KEY = previousKey;
+    if (previousViteUrl !== undefined) process.env.VITE_SUPABASE_URL = previousViteUrl;
+    if (previousViteKey !== undefined) process.env.VITE_SUPABASE_ANON_KEY = previousViteKey;
+    cleanTestArtifacts(db, { keepBaseline: true });
+    db.prepare(
+      "UPDATE village_family_id_counters SET last_seq = 1 WHERE village_code = '94494'"
+    ).run();
+  }
+
+  const finalConsistency = verifyParivaarDataConsistency(db);
+  assert.equal(finalConsistency.consistent, true);
+  assert.equal(finalConsistency.summary_families, 1);
+  assert.equal(finalConsistency.summary_members, 3);
+
+  // The optional prebuilt LGD database must contain reference data ONLY.
+  const gzPath = path.join(ROOT, "data", "lgd", "lgd_locations.sqlite.gz");
+  if (fsModule.existsSync(gzPath)) {
+    const tempPath = path.join(ROOT, ".cache", `lgd-verify-${process.pid}.sqlite`);
+    fsModule.mkdirSync(path.dirname(tempPath), { recursive: true });
+    fsModule.writeFileSync(tempPath, zlib.gunzipSync(fsModule.readFileSync(gzPath)));
+    try {
+      const referenceDb = new DatabaseSync(tempPath, { readOnly: true });
+      const villages = referenceDb.prepare("SELECT COUNT(*) AS cnt FROM villages").get().cnt;
+      assert.ok(villages >= 100000, "The prebuilt LGD database must carry the full village list");
+      const registrations =
+        referenceDb
+          .prepare(
+            "SELECT COUNT(*) AS cnt FROM parivaar_registrations WHERE full_name NOT LIKE 'TEST_VERIFICATION_%'"
+          )
+          .get()?.cnt ?? 0;
+      assert.equal(registrations, 0, "The prebuilt LGD database must never contain real registrations");
+      referenceDb.close();
+    } finally {
+      for (const suffix of ["", "-wal", "-shm"]) {
+        try {
+          fsModule.rmSync(`${tempPath}${suffix}`, { force: true });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+});
+
+await suiteChain;
+
 console.log("==============================================================");
-console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency + Performance/Real-Time Sync) passed!`);
+console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency + Performance/Real-Time Sync + Durability) passed!`);
 console.log("==============================================================");

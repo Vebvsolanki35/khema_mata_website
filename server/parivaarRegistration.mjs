@@ -21,6 +21,7 @@
 import {
   applyPostgresRegistrationToReplica,
   insertParivaarRegistration,
+  removeReplicaRegistration,
 } from "./parivaarDatabase.mjs";
 import {
   getSupabaseServerClient,
@@ -300,11 +301,19 @@ export async function createParivaarRegistration(payload, db) {
   mark("record_store");
 
   if (isStoreConfigured() && !store.ok) {
+    // The database did not confirm the write.  Undo the local commit so this
+    // device can never display (or count) a family that was never saved.  An
+    // existing household record that was only *updated* is left untouched.
+    if (!local.updated) {
+      removeReplicaRegistration(db, local.id);
+      mark("replica_rollback");
+    }
     return {
       ok: false,
       code: "PERSISTENCE_FAILED",
       message:
         "We could not confirm that your registration reached the database, so it was not saved. Please try again in a moment.",
+      replica_rolled_back: !local.updated,
       timings,
     };
   }
