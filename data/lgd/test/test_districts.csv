@@ -1,0 +1,5 @@
+district_code,state_code,name_en,name_local,census_2011_code,latitude,longitude,coord_source,coord_verified,source
+94,8,Bundi,बूंदी,116,25.4416,75.6376,LGD / Census GIS District Reference,true,LGD (lgdirectory.gov.in)
+105,8,Jalore,जालोर,111,25.3459,72.6155,LGD / Census GIS District Reference,true,LGD (lgdirectory.gov.in)
+456,24,Patan,पाटन,470,23.8493,72.1266,LGD / Census GIS District Reference,true,LGD (lgdirectory.gov.in)
+9999,99,OrphanDistrict,,000,,,,,LGD

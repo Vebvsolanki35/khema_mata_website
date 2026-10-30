@@ -51,7 +51,7 @@ function Footer() {
           <h3 className="font-bold text-sm mb-2" style={{ color: "var(--gold)" }}>
             🔗 {f.quickLinks}
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {SECTIONS.map((section) => (
               <div key={section.id}>
                 <Link

@@ -7,10 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lgd:test": "node scripts/import-lgd-locations.mjs --test",
+    "lgd:import": "node scripts/import-lgd-locations.mjs --generate-bundle",
+    "lgd:supabase": "node scripts/import-lgd-locations.mjs --supabase",
+    "test:parivaar": "node scripts/test-parivaar.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
+    "leaflet": "^1.9.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1"

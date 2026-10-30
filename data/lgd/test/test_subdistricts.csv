@@ -1,0 +1,8 @@
+subdistrict_code,district_code,state_code,name_en,name_local,admin_type,census_2011_code,source
+623,94,8,Nainwa,नैनवां,Tehsil,00623,LGD (lgdirectory.gov.in)
+626,94,8,Bundi,बूंदी,Tehsil,00626,LGD (lgdirectory.gov.in)
+6033,94,8,Talera,तालेड़ा,Tehsil,06033,LGD (lgdirectory.gov.in)
+BLK-639,94,8,Talera (Block),तालेड़ा (ब्लॉक),Block,,LGD (lgdirectory.gov.in)
+510,105,8,Bhinmal,भीनमाल,Tehsil,00510,LGD (lgdirectory.gov.in)
+3757,456,24,Patan,पाटन,Taluka,03757,LGD (lgdirectory.gov.in)
+8888,9999,8,OrphanTehsil,,Tehsil,,LGD

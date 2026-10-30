@@ -1,5 +1,5 @@
 /**
- * The five primary navigation sections.
+ * The six primary navigation sections.
  *
  * IMPORTANT — nothing here deletes a route. Every page that existed before the
  * refactor still has its own URL; pages that are no longer a *primary* tab are
@@ -22,6 +22,7 @@
  *   /donation     → Trust & Seva        (primary tab hub)
  *   /trust        → Trust & Seva
  *   /contact      → Trust & Seva
+ *   /parivaar     → Solanki Parivaar    (primary tab)
  *   /admin, /admin/login → intentionally NOT in public navigation (protected)
  */
 export const SECTIONS = [
@@ -79,6 +80,14 @@ export const SECTIONS = [
       { to: "/trust", labelKey: "trust", icon: "🏛️" },
       { to: "/contact", labelKey: "contact", icon: "📞" },
     ],
+  },
+  {
+    id: "parivaar",
+    to: "/parivaar",
+    labelKey: "parivaar",
+    shortKey: "parivaarShort",
+    icon: "👨‍👩‍👧‍👦",
+    children: [],
   },
 ];
 

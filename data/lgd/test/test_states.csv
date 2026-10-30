@@ -1,0 +1,5 @@
+state_code,name_en,name_local,state_or_ut,census_2011_code,latitude,longitude,coord_source,coord_verified,source
+8,Rajasthan,राजस्थान,State,08,26.9124,75.7873,LGD / Survey of India State Reference,true,LGD (lgdirectory.gov.in)
+24,Gujarat,गुजरात,State,24,23.0225,72.5714,LGD / Survey of India State Reference,true,LGD (lgdirectory.gov.in)
+8,Rajasthan,राजस्थान,State,08,26.9124,75.7873,LGD / Survey of India State Reference,true,LGD (lgdirectory.gov.in)
+,MissingCodeState,,State,,,,,,LGD
