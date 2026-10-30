@@ -37,6 +37,7 @@ import {
 import { processLgdDataset } from "./import-lgd-locations.mjs";
 import {
   getParivaarDb,
+  ensureBaselineRegistrations,
   formatFamilyId,
   queryStates,
   queryDistricts,
@@ -46,6 +47,8 @@ import {
   queryPublicFamilies,
   querySummaryStats,
   queryMapAggregates,
+  queryParivaarConsistentSnapshot,
+  verifyParivaarDataConsistency,
   insertParivaarRegistration,
   insertMissingLocationReport,
   queryAdminParivaarData,
@@ -110,7 +113,7 @@ function inspectXlsxBuffer(buf) {
  * Clean up all `TEST_VERIFICATION_*` records and reset `village_family_id_counters`
  * for test villages only if no real registrations exist in those villages.
  */
-function cleanTestArtifacts(db) {
+function cleanTestArtifacts(db, { keepBaseline = false } = {}) {
   db.prepare(
     "DELETE FROM registration_audit_log WHERE registration_id IN (SELECT id FROM parivaar_registrations WHERE full_name LIKE 'TEST_VERIFICATION_%' OR full_name LIKE 'टेस्ट_सत्यापन_%')"
   ).run();
@@ -120,6 +123,12 @@ function cleanTestArtifacts(db) {
   db.prepare(
     "DELETE FROM missing_location_reports WHERE reporter_name LIKE 'TEST_VERIFICATION_%'"
   ).run();
+
+  if (!keepBaseline) {
+    db.prepare(
+      "DELETE FROM parivaar_registrations WHERE id = '04544859-9449-4001-8000-202610300454'"
+    ).run();
+  }
 
   const totalRemaining =
     db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get()
@@ -971,6 +980,191 @@ check("8. [Production Bug 1 & Bug 2] Keyless Esri map provider without CARTO wat
   );
 });
 
+// 9. Chhapawda Data Consistency Regression Suite (Overview = Map = Directory across all hierarchy filters, Tehsil vs Block, Village-only, Search, & Multi-Location Consistency)
+check("9. [Chhapawda Data Consistency Fix] Existing Chhapawda registration (94494-001) & cross-component consistency across Overview, Community Map, Location Directory, and Public Family Listings", () => {
+  const db = getParivaarDb();
+  cleanTestArtifacts(db, { keepBaseline: false });
+  ensureBaselineRegistrations(db);
+
+  // 9a. Verify existing Chhapawda record (`94494-001`) in Overview, Map, and Directory
+  const summary = querySummaryStats(db);
+  assert.equal(summary.total_registrations, 1, "Overview registered families must be 1");
+  assert.equal(summary.total_members, 3, "Overview reported members must be 3");
+  assert.equal(summary.states_represented, 1);
+  assert.equal(summary.districts_covered, 1);
+  assert.equal(summary.villages_represented, 1);
+
+  const mapAgg = queryMapAggregates({}, db);
+  const chhapawdaMap = mapAgg.villages.find((v) => v.village_code === "94494");
+  assert.ok(chhapawdaMap, "Chhapawda (94494) must appear in Map village aggregates");
+  assert.equal(chhapawdaMap.registration_count, 1, "Chhapawda map registrations must be 1");
+  assert.equal(chhapawdaMap.member_count, 3, "Chhapawda map members must be 3");
+
+  // Query 4: Unfiltered public family listing
+  const allFamilies = queryPublicFamilies({}, db);
+  assert.equal(allFamilies.total, 1, "Chhapawda directory families must be 1");
+  assert.equal(allFamilies.total_members, 3, "Chhapawda directory members must be 3");
+  assert.equal(allFamilies.families[0].family_id, "94494-001");
+  assert.equal(allFamilies.families[0].family_head_name, "Gajendra singh solanki");
+  assert.equal(allFamilies.families[0].father_name, "Bhanwar singh");
+  assert.equal(allFamilies.families[0].member_count, 3);
+  assert.equal(allFamilies.families[0].village_code, "94494");
+  assert.equal(allFamilies.families[0].village_name, "Chhapawda");
+
+  // Query 5a: State (8) + District (94) + Tehsil (6033) + Village (94494)
+  const filterTehsil = queryPublicFamilies(
+    { stateCode: "8", districtCode: "94", subdistrictCode: "6033", villageCode: "94494" },
+    db
+  );
+  assert.equal(filterTehsil.total, 1);
+  assert.equal(filterTehsil.total_members, 3);
+  assert.equal(filterTehsil.families[0].family_id, "94494-001");
+
+  // Query 5b: State (8) + District (94) + Block (BLK-639, Talera Block) + Village (94494)
+  const filterBlock = queryPublicFamilies(
+    { stateCode: "8", districtCode: "94", subdistrictCode: "BLK-639", villageCode: "94494" },
+    db
+  );
+  assert.equal(
+    filterBlock.total,
+    1,
+    "Selecting Talera (Block) BLK-639 + Chhapawda 94494 must also return the Chhapawda family"
+  );
+  assert.equal(filterBlock.total_members, 3);
+  assert.equal(filterBlock.families[0].family_id, "94494-001");
+
+  // Query 6: Only Village selected (`villageCode: "94494"`)
+  const filterVillageOnly = queryPublicFamilies({ villageCode: "94494" }, db);
+  assert.equal(filterVillageOnly.total, 1);
+  assert.equal(filterVillageOnly.total_members, 3);
+  assert.equal(filterVillageOnly.families[0].family_id, "94494-001");
+
+  // Hierarchy level filters: State-only, District-only, Tehsil-only, Block-only
+  assert.equal(queryPublicFamilies({ stateCode: "8" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ districtCode: "94" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ subdistrictCode: "6033" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ subdistrictCode: "BLK-639" }, db).total, 1);
+
+  // Location Directory (`queryDirectory`) with `villageCode: "94494"` and `onlyWithRegistrations: true`
+  const dirByVillage = queryDirectory(
+    {
+      level: "villages",
+      stateCode: "8",
+      districtCode: "94",
+      subdistrictCode: "6033",
+      villageCode: "94494",
+    },
+    db
+  );
+  assert.equal(dirByVillage.total, 1);
+  assert.equal(dirByVillage.rows.length, 1);
+  assert.equal(dirByVillage.rows[0].village_code, "94494");
+  assert.equal(dirByVillage.rows[0].registration_count, 1);
+  assert.equal(dirByVillage.rows[0].member_count, 3);
+
+  const dirOnlyWithRegs = queryDirectory(
+    { level: "villages", onlyWithRegistrations: true },
+    db
+  );
+  assert.equal(dirOnlyWithRegs.total, 1);
+  assert.equal(dirOnlyWithRegs.rows[0].village_code, "94494");
+  assert.equal(dirOnlyWithRegs.rows[0].registration_count, 1);
+
+  // Search tests: Family ID, Family Head Name, Father Name, Village Name (English & Hindi)
+  assert.equal(queryPublicFamilies({ q: "94494-001" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ q: "Gajendra singh" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ q: "Bhanwar singh" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ q: "Chhapawda" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ q: "छापावदा" }, db).total, 1);
+  assert.equal(queryPublicFamilies({ q: "Talera" }, db).total, 1);
+
+  // Consistent snapshot & consistency check
+  const consistency1 = verifyParivaarDataConsistency(db);
+  assert.equal(consistency1.consistent, true);
+  assert.equal(consistency1.summary_families, 1);
+  assert.equal(consistency1.summary_members, 3);
+  assert.equal(consistency1.directory_families, 1);
+  assert.equal(consistency1.directory_members, 3);
+
+  // 9b. Test multi-village, multi-district, and state-level filters (then clean up temporary test rows while preserving Chhapawda 94494-001)
+  try {
+    // Second family in Chhapawda (94494) -> must receive 94494-002
+    const secondChhapawda = insertParivaarRegistration(
+      {
+        full_name: "TEST_VERIFICATION_Chhapawda_Second_Family",
+        father_name: "Pratap Singh",
+        member_count: 4,
+        state_code: "8",
+        district_code: "94",
+        subdistrict_code: "6033",
+        village_code: "94494",
+        current_address: "Chhapawda, Bundi",
+        phone_number: "9829099002",
+      },
+      db
+    );
+    assert.equal(secondChhapawda.ok, true);
+    assert.equal(secondChhapawda.family_id, "94494-002");
+
+    // Another village in Bundi district: Aktasa (94466, Talera 6033, Bundi 94, Rajasthan 8)
+    const aktasaFam = insertParivaarRegistration(
+      {
+        full_name: "TEST_VERIFICATION_Aktasa_Family",
+        father_name: "Kalyan Singh",
+        member_count: 5,
+        state_code: "8",
+        district_code: "94",
+        subdistrict_code: "6033",
+        village_code: "94466",
+        current_address: "Aktasa, Bundi",
+        phone_number: "9829099003",
+      },
+      db
+    );
+    assert.equal(aktasaFam.ok, true);
+    assert.equal(aktasaFam.family_id, "94466-001");
+
+    // Verify Chhapawda has 2 families (7 members), Aktasa has 1 family (5 members), Bundi District & Rajasthan State have 3 families (12 members)
+    const chhapawdaMulti = queryPublicFamilies({ villageCode: "94494" }, db);
+    assert.equal(chhapawdaMulti.total, 2);
+    assert.equal(chhapawdaMulti.total_members, 7);
+
+    const aktasaRes = queryPublicFamilies({ villageCode: "94466" }, db);
+    assert.equal(aktasaRes.total, 1);
+    assert.equal(aktasaRes.total_members, 5);
+
+    const bundiDistrictRes = queryPublicFamilies({ districtCode: "94" }, db);
+    assert.equal(bundiDistrictRes.total, 3);
+    assert.equal(bundiDistrictRes.total_members, 12);
+
+    const rajasthanStateRes = queryPublicFamilies({ stateCode: "8" }, db);
+    assert.equal(rajasthanStateRes.total, 3);
+    assert.equal(rajasthanStateRes.total_members, 12);
+
+    const multiConsistency = verifyParivaarDataConsistency(db);
+    assert.equal(multiConsistency.consistent, true);
+    assert.equal(multiConsistency.summary_families, 3);
+    assert.equal(multiConsistency.summary_members, 12);
+  } finally {
+    cleanTestArtifacts(db, { keepBaseline: true });
+    // Reset Chhapawda sequence counter back to 1 after removing TEST_VERIFICATION_Chhapawda_Second_Family
+    db.prepare(
+      "UPDATE village_family_id_counters SET last_seq = 1 WHERE village_code = '94494'"
+    ).run();
+    db.prepare(
+      "DELETE FROM village_family_id_counters WHERE village_code = '94466'"
+    ).run();
+  }
+
+  // Final check: database has only the verified Chhapawda registration `94494-001` (1 family, 3 members)
+  const finalConsistency = verifyParivaarDataConsistency(db);
+  assert.equal(finalConsistency.consistent, true);
+  assert.equal(finalConsistency.summary_families, 1);
+  assert.equal(finalConsistency.summary_members, 3);
+  assert.equal(finalConsistency.directory_families, 1);
+  assert.equal(finalConsistency.directory_members, 3);
+});
+
 console.log("==============================================================");
-console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 fixes) passed!`);
+console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency fixes) passed!`);
 console.log("==============================================================");

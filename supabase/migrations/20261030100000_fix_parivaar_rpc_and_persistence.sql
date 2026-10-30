@@ -338,15 +338,21 @@ declare
 begin
   select
     count(*)::integer,
-    coalesce(sum(r.member_count), 0)::integer
+    coalesce(sum(coalesce(r.member_count, 1)), 0)::integer
   into v_total, v_members
   from public.parivaar_registrations r
   left join public.villages v on v.village_code = r.village_code
   where r.status = 'approved'
-    and (p_state_code is null or p_state_code = '' or r.state_code = p_state_code)
-    and (p_district_code is null or p_district_code = '' or r.district_code = p_district_code)
-    and (p_subdistrict_code is null or p_subdistrict_code = '' or r.subdistrict_code = p_subdistrict_code)
-    and (p_village_code is null or p_village_code = '' or r.village_code = p_village_code)
+    and (p_state_code is null or p_state_code = '' or r.state_code = p_state_code or v.state_code = p_state_code)
+    and (p_district_code is null or p_district_code = '' or r.district_code = p_district_code or v.district_code = p_district_code)
+    and (
+      p_subdistrict_code is null
+      or p_subdistrict_code = ''
+      or r.subdistrict_code = p_subdistrict_code
+      or v.subdistrict_code = p_subdistrict_code
+      or v.block_code = p_subdistrict_code
+    )
+    and (p_village_code is null or p_village_code = '' or r.village_code = p_village_code or v.village_code = p_village_code)
     and (
       v_q is null
       or lower(coalesce(r.family_id, '')) like ('%' || v_q || '%')
@@ -354,6 +360,7 @@ begin
       or (r.public_visibility <> 'private' and lower(coalesce(r.father_name, '')) like ('%' || v_q || '%'))
       or lower(coalesce(r.thikana, '')) like ('%' || v_q || '%')
       or lower(coalesce(v.name_en, '')) like ('%' || v_q || '%')
+      or lower(coalesce(r.village_code, '')) like ('%' || v_q || '%')
     );
 
   select coalesce(jsonb_agg(row_to_json(t)), '[]'::jsonb)
@@ -367,26 +374,32 @@ begin
       case when r.public_visibility = 'private' then null else r.full_name end as head_name,
       case when r.public_visibility = 'private' then null else nullif(btrim(coalesce(r.father_name, '')), '') end as father_name,
       case when r.public_visibility = 'private' then null else coalesce(r.member_count, 1) end as member_count,
-      r.state_code,
+      coalesce(v.state_code, r.state_code) as state_code,
       coalesce(s.name_en, r.state_code) as state_name,
-      r.district_code,
+      coalesce(v.district_code, r.district_code) as district_code,
       coalesce(d.name_en, r.district_code) as district_name,
-      r.subdistrict_code,
+      coalesce(v.subdistrict_code, r.subdistrict_code) as subdistrict_code,
       coalesce(sb.name_en, r.subdistrict_code) as subdistrict_name,
       coalesce(sb.admin_type, 'Tehsil') as admin_type,
       r.village_code,
       coalesce(v.name_en, r.thikana) as village_name,
       r.created_at
     from public.parivaar_registrations r
-    left join public.states s on s.state_code = r.state_code
-    left join public.districts d on d.district_code = r.district_code
-    left join public.subdistricts_blocks sb on sb.subdistrict_code = r.subdistrict_code
     left join public.villages v on v.village_code = r.village_code
+    left join public.states s on s.state_code = coalesce(v.state_code, r.state_code)
+    left join public.districts d on d.district_code = coalesce(v.district_code, r.district_code)
+    left join public.subdistricts_blocks sb on sb.subdistrict_code = coalesce(v.subdistrict_code, r.subdistrict_code)
     where r.status = 'approved'
-      and (p_state_code is null or p_state_code = '' or r.state_code = p_state_code)
-      and (p_district_code is null or p_district_code = '' or r.district_code = p_district_code)
-      and (p_subdistrict_code is null or p_subdistrict_code = '' or r.subdistrict_code = p_subdistrict_code)
-      and (p_village_code is null or p_village_code = '' or r.village_code = p_village_code)
+      and (p_state_code is null or p_state_code = '' or r.state_code = p_state_code or v.state_code = p_state_code)
+      and (p_district_code is null or p_district_code = '' or r.district_code = p_district_code or v.district_code = p_district_code)
+      and (
+        p_subdistrict_code is null
+        or p_subdistrict_code = ''
+        or r.subdistrict_code = p_subdistrict_code
+        or v.subdistrict_code = p_subdistrict_code
+        or v.block_code = p_subdistrict_code
+      )
+      and (p_village_code is null or p_village_code = '' or r.village_code = p_village_code or v.village_code = p_village_code)
       and (
         v_q is null
         or lower(coalesce(r.family_id, '')) like ('%' || v_q || '%')
@@ -394,6 +407,7 @@ begin
         or (r.public_visibility <> 'private' and lower(coalesce(r.father_name, '')) like ('%' || v_q || '%'))
         or lower(coalesce(r.thikana, '')) like ('%' || v_q || '%')
         or lower(coalesce(v.name_en, '')) like ('%' || v_q || '%')
+        or lower(coalesce(r.village_code, '')) like ('%' || v_q || '%')
       )
     order by r.family_id asc, r.created_at desc
     limit v_page_size offset v_offset

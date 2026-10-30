@@ -117,6 +117,7 @@ function Parivaar() {
   const {
     stats,
     aggregates,
+    publicFamilies,
     loadingStats,
     dbStatus,
     dbError,
@@ -655,6 +656,7 @@ function Parivaar() {
         queryDirectory={queryDirectory}
         queryPublicFamilies={queryPublicFamilies}
         aggregates={aggregates}
+        initialPublicFamilies={publicFamilies}
         onSelectLocationForMap={setSelectedMapLocation}
         onPrefillRegistration={handlePrefillRegistration}
         externalFilter={directoryExternalFilter}

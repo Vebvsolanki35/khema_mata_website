@@ -21,13 +21,14 @@ function LocationDirectory({
   queryDirectory,
   queryPublicFamilies,
   aggregates,
+  initialPublicFamilies = [],
   onSelectLocationForMap,
   onPrefillRegistration,
   externalFilter,
   refreshTick = 0,
   t,
 }) {
-  const [directoryTab, setDirectoryTab] = useState("locations"); // "locations" | "families"
+  const [directoryTab, setDirectoryTab] = useState("families"); // "families" | "locations"
   const [selectedState, setSelectedState] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedSubdistrict, setSelectedSubdistrict] = useState("");
@@ -181,6 +182,71 @@ function LocationDirectory({
     };
   }, [selectedSubdistrict, selectedDistrict, selectedState, fetchVillages]);
 
+  // Helper to filter `initialPublicFamilies` by active filters as a fallback/consistent source of truth
+  const matchedInitialFamilies = useMemo(() => {
+    const list = Array.isArray(initialPublicFamilies) ? initialPublicFamilies : [];
+    if (list.length === 0) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return list.filter((f) => {
+      if (!f) return false;
+      if (selectedVillage && String(f.village_code) !== String(selectedVillage)) {
+        return false;
+      }
+      if (selectedState && String(f.state_code) !== String(selectedState)) {
+        return false;
+      }
+      if (selectedDistrict && String(f.district_code) !== String(selectedDistrict)) {
+        return false;
+      }
+      if (selectedSubdistrict && !selectedVillage) {
+        const sub = String(selectedSubdistrict);
+        const stripped = sub.startsWith("BLK-") ? sub.slice(4) : sub;
+        if (
+          String(f.subdistrict_code) !== sub &&
+          String(f.subdistrict_code) !== stripped
+        ) {
+          // Also check if the family's village belongs to this subdistrict in `aggregates.villages`
+          const aggV = (aggregates?.villages || []).find(
+            (v) => String(v.village_code) === String(f.village_code)
+          );
+          if (
+            !aggV ||
+            (String(aggV.subdistrict_code) !== sub &&
+              String(aggV.block_code) !== sub)
+          ) {
+            return false;
+          }
+        }
+      }
+      if (q) {
+        const hay = [
+          f.family_id,
+          f.is_public ? f.family_head_name : "",
+          f.is_public ? f.father_name : "",
+          f.village_name,
+          f.official_village_name,
+          f.village_code,
+          f.subdistrict_name,
+          f.district_name,
+          f.state_name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [
+    initialPublicFamilies,
+    aggregates,
+    selectedState,
+    selectedDistrict,
+    selectedSubdistrict,
+    selectedVillage,
+    searchQuery,
+  ]);
+
   // Fetch paginated Location Hierarchy rows
   useEffect(() => {
     let active = true;
@@ -192,6 +258,8 @@ function LocationDirectory({
           stateCode: selectedState,
           districtCode: selectedDistrict,
           subdistrictCode: selectedSubdistrict,
+          villageCode: selectedVillage,
+          onlyWithRegistrations: onlyWithRegs,
           search: searchQuery,
           page,
           pageSize,
@@ -219,6 +287,8 @@ function LocationDirectory({
     selectedState,
     selectedDistrict,
     selectedSubdistrict,
+    selectedVillage,
+    onlyWithRegs,
     searchQuery,
     page,
     retryTick,
@@ -246,9 +316,21 @@ function LocationDirectory({
       })
       .then((res) => {
         if (!active) return;
-        setFamilies(res.families || []);
-        setTotalFamilies(res.totalCount || 0);
-        setTotalMembersInFilter(res.totalMembers || 0);
+        const apiFamilies = Array.isArray(res.families) ? res.families : [];
+        if (apiFamilies.length > 0 || matchedInitialFamilies.length === 0) {
+          setFamilies(apiFamilies);
+          setTotalFamilies(Number(res.totalCount || 0));
+          setTotalMembersInFilter(Number(res.totalMembers || 0));
+        } else {
+          // Consistent fallback when `map-aggregates` has verified matching families
+          const fallbackMembers = matchedInitialFamilies.reduce(
+            (sum, fam) => sum + (Number(fam.member_count) || 1),
+            0
+          );
+          setFamilies(matchedInitialFamilies);
+          setTotalFamilies(matchedInitialFamilies.length);
+          setTotalMembersInFilter(fallbackMembers);
+        }
         setLoadingFamilies(false);
       })
       .catch((err) => {
@@ -274,6 +356,7 @@ function LocationDirectory({
     retryTick,
     refreshTick,
     queryPublicFamilies,
+    matchedInitialFamilies,
   ]);
 
   // Automatically switch to Family Listings if user types a Family ID pattern (e.g. "94494-001")
@@ -288,38 +371,24 @@ function LocationDirectory({
   };
 
   const getRowRegistrationCount = (row) => {
-    if (
-      row.village_code &&
-      regCountMaps.byVillage.has(String(row.village_code))
-    ) {
-      return regCountMaps.byVillage.get(String(row.village_code)) || 0;
-    }
-    if (typeof row.registration_count === "number") {
-      return row.registration_count;
-    }
-    if (row.village_code) {
-      return regCountMaps.byVillage.get(String(row.village_code)) || 0;
-    }
-    if (row.subdistrict_code) {
-      return regCountMaps.bySubdistrict.get(String(row.subdistrict_code)) || 0;
-    }
-    if (row.district_code) {
-      return regCountMaps.byDistrict.get(String(row.district_code)) || 0;
-    }
-    return 0;
+    const rowCnt =
+      typeof row.registration_count === "number" ? row.registration_count : 0;
+    const mapCnt = row.village_code
+      ? regCountMaps.byVillage.get(String(row.village_code)) || 0
+      : row.subdistrict_code
+      ? regCountMaps.bySubdistrict.get(String(row.subdistrict_code)) || 0
+      : row.district_code
+      ? regCountMaps.byDistrict.get(String(row.district_code)) || 0
+      : 0;
+    return Math.max(rowCnt, mapCnt);
   };
 
   const getRowMemberCount = (row) => {
-    if (
-      row.village_code &&
-      regCountMaps.membersByVillage.has(String(row.village_code))
-    ) {
-      return regCountMaps.membersByVillage.get(String(row.village_code)) || 0;
-    }
-    if (typeof row.member_count === "number") {
-      return row.member_count;
-    }
-    return 0;
+    const rowMem = typeof row.member_count === "number" ? row.member_count : 0;
+    const mapMem = row.village_code
+      ? regCountMaps.membersByVillage.get(String(row.village_code)) || 0
+      : 0;
+    return Math.max(rowMem, mapMem);
   };
 
   const displayedRows = useMemo(() => {
@@ -873,8 +942,12 @@ function LocationDirectory({
               >
                 <input
                   type="checkbox"
+                  data-testid="directory-only-with-registrations-toggle"
                   checked={onlyWithRegs}
-                  onChange={(e) => setOnlyWithRegs(e.target.checked)}
+                  onChange={(e) => {
+                    setOnlyWithRegs(e.target.checked);
+                    setPage(1);
+                  }}
                   className="w-4 h-4 accent-red-900 rounded"
                 />
                 <span>{t.onlyLocationsWithRegistrations}</span>

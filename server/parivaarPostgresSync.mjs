@@ -1,12 +1,16 @@
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { ensureBaselineRegistrations } from "./parivaarDatabase.mjs";
 
 const PG_STORE_KEY = "parivaar_pg_store_v1";
+const STORAGE_BUCKET = "gallery";
+const STORAGE_OBJECT_PATH = "_system/parivaar_pg_store_v1.json";
 const HYDRATION_TTL_MS = 4000;
 
 let cachedClient = null;
 let cachedClientKey = "";
 let lastHydratedAt = 0;
+let inFlightHydrationPromise = null;
 
 function getSupabaseServerCredentials() {
   const url = String(
@@ -100,15 +104,220 @@ async function withTimeout(promise, ms = 3500) {
   }
 }
 
+function applyStorePayloadToSqlite(db, parsed, secretKey) {
+  if (!parsed || typeof parsed !== "object") return 0;
+
+  let hydratedCount = 0;
+  const regs = Array.isArray(parsed.registrations) ? parsed.registrations : [];
+  const counters = Array.isArray(parsed.counters) ? parsed.counters : [];
+  const audits = Array.isArray(parsed.audit_logs) ? parsed.audit_logs : [];
+  const reports = Array.isArray(parsed.missing_reports)
+    ? parsed.missing_reports
+    : [];
+  const deletedIdsList = Array.isArray(parsed.deleted_ids)
+    ? parsed.deleted_ids
+    : [];
+  const deletedIds = new Set(deletedIdsList.map((x) => String(x)));
+
+  ensureBaselineRegistrations(db, { deletedIds: deletedIdsList });
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const delId of deletedIds) {
+      db.prepare("DELETE FROM parivaar_registrations WHERE id = ?").run(
+        String(delId)
+      );
+    }
+
+    const upsertCounterStmt = db.prepare(
+      `INSERT INTO village_family_id_counters (village_code, last_seq, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(village_code) DO UPDATE SET
+         last_seq = MAX(village_family_id_counters.last_seq, excluded.last_seq),
+         updated_at = excluded.updated_at`
+    );
+
+    for (const c of counters) {
+      if (!c || !c.village_code) continue;
+      upsertCounterStmt.run(
+        String(c.village_code),
+        Number(c.last_seq) || 0,
+        c.updated_at || new Date().toISOString()
+      );
+    }
+
+    const upsertRegStmt = db.prepare(
+      `INSERT INTO parivaar_registrations (
+         id, family_id, full_name, father_name, member_count,
+         state_code, district_code, subdistrict_code, village_code,
+         thikana, thikana_same_as_village, current_address, phone_number,
+         consent_given, public_visibility, status, admin_note,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         family_id = COALESCE(parivaar_registrations.family_id, excluded.family_id),
+         full_name = excluded.full_name,
+         father_name = excluded.father_name,
+         member_count = excluded.member_count,
+         state_code = excluded.state_code,
+         district_code = excluded.district_code,
+         subdistrict_code = excluded.subdistrict_code,
+         village_code = excluded.village_code,
+         thikana = excluded.thikana,
+         thikana_same_as_village = excluded.thikana_same_as_village,
+         current_address = excluded.current_address,
+         phone_number = excluded.phone_number,
+         public_visibility = excluded.public_visibility,
+         status = excluded.status,
+         admin_note = excluded.admin_note,
+         updated_at = excluded.updated_at`
+    );
+
+    for (const r of regs) {
+      if (!r || !r.id || deletedIds.has(String(r.id))) continue;
+      const fullName = r.full_name_enc
+        ? decryptText(r.full_name_enc, secretKey)
+        : r.full_name || "";
+      const fatherName = r.father_name_enc
+        ? decryptText(r.father_name_enc, secretKey)
+        : r.father_name || null;
+      const currentAddress = r.current_address_enc
+        ? decryptText(r.current_address_enc, secretKey)
+        : r.current_address || "India";
+      const phoneNumber = r.phone_number_enc
+        ? decryptText(r.phone_number_enc, secretKey)
+        : r.phone_number || "9000000000";
+
+      if (!fullName) continue;
+
+      try {
+        upsertRegStmt.run(
+          String(r.id),
+          r.family_id ? String(r.family_id) : null,
+          String(fullName),
+          fatherName ? String(fatherName) : null,
+          Math.max(1, Number(r.member_count) || 1),
+          String(r.state_code || "8"),
+          String(r.district_code || "94"),
+          String(r.subdistrict_code || "6033"),
+          r.village_code ? String(r.village_code) : null,
+          String(r.thikana || ""),
+          r.thikana_same_as_village === false ? 0 : 1,
+          String(currentAddress),
+          String(phoneNumber),
+          1,
+          String(r.public_visibility || "default"),
+          String(r.status || "approved"),
+          r.admin_note ? String(r.admin_note) : null,
+          r.created_at || new Date().toISOString(),
+          r.updated_at || r.created_at || new Date().toISOString()
+        );
+        hydratedCount += 1;
+      } catch {
+        // Ignore individual row conflict if duplicate phone+name+district exists under another id
+      }
+
+      if (r.family_id && r.village_code) {
+        const seqPart = Number(
+          String(r.family_id).split("-")[1]?.replace(/\D/g, "") || 0
+        );
+        if (seqPart > 0) {
+          upsertCounterStmt.run(
+            String(r.village_code),
+            seqPart,
+            r.updated_at || new Date().toISOString()
+          );
+        }
+      }
+    }
+
+    const upsertAuditStmt = db.prepare(
+      `INSERT OR IGNORE INTO registration_audit_log (
+         id, registration_id, family_id, action, changed_fields,
+         previous_values, new_values, admin_note, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const a of audits) {
+      if (!a || !a.id) continue;
+      upsertAuditStmt.run(
+        String(a.id),
+        String(a.registration_id || ""),
+        String(a.family_id || ""),
+        String(a.action || "updated"),
+        typeof a.changed_fields === "string"
+          ? a.changed_fields
+          : JSON.stringify(a.changed_fields || []),
+        typeof a.previous_values === "string"
+          ? a.previous_values
+          : JSON.stringify(a.previous_values || {}),
+        typeof a.new_values === "string"
+          ? a.new_values
+          : JSON.stringify(a.new_values || {}),
+        a.admin_note || null,
+        a.created_at || new Date().toISOString()
+      );
+    }
+
+    const upsertReportStmt = db.prepare(
+      `INSERT OR IGNORE INTO missing_location_reports (
+         id, reporter_name, reporter_phone, state_code, district_code,
+         subdistrict_code, missing_level, proposed_name, parent_context,
+         pincode, notes, status, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const rep of reports) {
+      if (!rep || !rep.id) continue;
+      const repPhone = rep.reporter_phone_enc
+        ? decryptText(rep.reporter_phone_enc, secretKey)
+        : rep.reporter_phone || null;
+      upsertReportStmt.run(
+        String(rep.id),
+        String(rep.reporter_name || ""),
+        repPhone || null,
+        rep.state_code || null,
+        rep.district_code || null,
+        rep.subdistrict_code || null,
+        String(rep.missing_level || "village"),
+        String(rep.proposed_name || ""),
+        rep.parent_context || null,
+        rep.pincode || null,
+        rep.notes || null,
+        String(rep.status || "pending"),
+        rep.created_at || new Date().toISOString()
+      );
+    }
+
+    db.exec("COMMIT");
+  } catch (txErr) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    throw txErr;
+  }
+
+  return hydratedCount;
+}
+
 /**
- * Hydrates the local SQLite database from PostgreSQL (`public.site_content` + `public.parivaar_registrations` RPC)
- * so that Vercel Serverless cold starts preserve all registrations, sequence counters, and audit logs.
+ * Hydrates the local SQLite database from baseline verified production records,
+ * PostgreSQL (`public.site_content`), Supabase Storage (`gallery/_system/parivaar_pg_store_v1.json`),
+ * and `public.get_public_parivaar_families` RPC so that Vercel Serverless cold starts and
+ * concurrent instances always return identical registration data.
  */
 export async function ensurePostgresHydrated(db, { force = false } = {}) {
+  if (!db) {
+    return { hydrated: false, reason: "no_db" };
+  }
+
+  // Always guarantee baseline verified registrations (e.g. Chhapawda `94494-001`) are in `db` synchronously first
+  ensureBaselineRegistrations(db);
+
   const creds = getSupabaseServerCredentials();
   const client = getSupabaseServerClient();
-  if (!creds || !client || !db) {
-    return { hydrated: false, reason: "unconfigured" };
+  if (!creds || !client) {
+    return { hydrated: true, baselineOnly: true, reason: "unconfigured" };
   }
 
   const now = Date.now();
@@ -116,241 +325,129 @@ export async function ensurePostgresHydrated(db, { force = false } = {}) {
     return { hydrated: true, cached: true };
   }
 
-  let hydratedFromStore = false;
-  let hydratedCount = 0;
+  if (!force && inFlightHydrationPromise) {
+    return inFlightHydrationPromise;
+  }
 
-  try {
-    // 1. Read encrypted registry store from PostgreSQL `public.site_content`
-    const { data: storeRow, error: storeErr } = await withTimeout(
-      client
-        .from("site_content")
-        .select("key, value")
-        .eq("key", PG_STORE_KEY)
-        .maybeSingle(),
-      3500
-    );
+  inFlightHydrationPromise = (async () => {
+    let hydratedFromStore = false;
+    let hydratedCount = 0;
 
-    if (!storeErr && storeRow && storeRow.value) {
-      let parsed = null;
+    try {
+      let parsedPayload = null;
+
+      // 1. Try reading encrypted registry store from PostgreSQL `public.site_content`
       try {
-        parsed = JSON.parse(storeRow.value);
+        const { data: storeRow, error: storeErr } = await withTimeout(
+          client
+            .from("site_content")
+            .select("key, value")
+            .eq("key", PG_STORE_KEY)
+            .maybeSingle(),
+          3000
+        );
+        if (!storeErr && storeRow && storeRow.value) {
+          parsedPayload = JSON.parse(storeRow.value);
+        }
       } catch {
-        parsed = null;
+        // Fallback to Storage / RPC
       }
 
-      if (parsed && typeof parsed === "object") {
-        hydratedFromStore = true;
-        const regs = Array.isArray(parsed.registrations)
-          ? parsed.registrations
-          : [];
-        const counters = Array.isArray(parsed.counters) ? parsed.counters : [];
-        const audits = Array.isArray(parsed.audit_logs)
-          ? parsed.audit_logs
-          : [];
-        const reports = Array.isArray(parsed.missing_reports)
-          ? parsed.missing_reports
-          : [];
-        const deletedIds = new Set(
-          Array.isArray(parsed.deleted_ids) ? parsed.deleted_ids : []
-        );
-
-        db.exec("BEGIN IMMEDIATE");
+      // 2. Fallback: Try reading encrypted registry store from Supabase Storage (`gallery/_system/...`)
+      if (!parsedPayload) {
         try {
-          for (const delId of deletedIds) {
-            db.prepare("DELETE FROM parivaar_registrations WHERE id = ?").run(
-              String(delId)
-            );
-          }
-
-          const upsertCounterStmt = db.prepare(
-            `INSERT INTO village_family_id_counters (village_code, last_seq, updated_at)
-             VALUES (?, ?, ?)
-             ON CONFLICT(village_code) DO UPDATE SET
-               last_seq = MAX(village_family_id_counters.last_seq, excluded.last_seq),
-               updated_at = excluded.updated_at`
+          const { data: blobData, error: dlErr } = await withTimeout(
+            client.storage.from(STORAGE_BUCKET).download(STORAGE_OBJECT_PATH),
+            3000
           );
-
-          for (const c of counters) {
-            if (!c || !c.village_code) continue;
-            upsertCounterStmt.run(
-              String(c.village_code),
-              Number(c.last_seq) || 0,
-              c.updated_at || new Date().toISOString()
-            );
+          if (!dlErr && blobData) {
+            const rawText = await blobData.text();
+            if (rawText) {
+              parsedPayload = JSON.parse(rawText);
+            }
           }
+        } catch {
+          // Fallback to RPC
+        }
+      }
 
-          const upsertRegStmt = db.prepare(
-            `INSERT INTO parivaar_registrations (
+      if (parsedPayload && typeof parsedPayload === "object") {
+        hydratedFromStore = true;
+        hydratedCount = applyStorePayloadToSqlite(db, parsedPayload, creds.key);
+      }
+
+      // 3. Also check `get_public_parivaar_families` RPC if available to merge any RPC-inserted records
+      try {
+        const { data: rpcData, error: rpcErr } = await withTimeout(
+          client.rpc("get_public_parivaar_families", {
+            p_page: 1,
+            p_page_size: 100,
+          }),
+          2500
+        );
+        if (!rpcErr && Array.isArray(rpcData?.families) && rpcData.families.length > 0) {
+          const checkStmt = db.prepare(
+            "SELECT id FROM parivaar_registrations WHERE family_id = ? LIMIT 1"
+          );
+          const insertRpcStmt = db.prepare(
+            `INSERT OR IGNORE INTO parivaar_registrations (
                id, family_id, full_name, father_name, member_count,
                state_code, district_code, subdistrict_code, village_code,
                thikana, thikana_same_as_village, current_address, phone_number,
-               consent_given, public_visibility, status, admin_note,
-               created_at, updated_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET
-               family_id = COALESCE(parivaar_registrations.family_id, excluded.family_id),
-               full_name = excluded.full_name,
-               father_name = excluded.father_name,
-               member_count = excluded.member_count,
-               state_code = excluded.state_code,
-               district_code = excluded.district_code,
-               subdistrict_code = excluded.subdistrict_code,
-               village_code = excluded.village_code,
-               thikana = excluded.thikana,
-               thikana_same_as_village = excluded.thikana_same_as_village,
-               current_address = excluded.current_address,
-               phone_number = excluded.phone_number,
-               public_visibility = excluded.public_visibility,
-               status = excluded.status,
-               admin_note = excluded.admin_note,
-               updated_at = excluded.updated_at`
+               consent_given, public_visibility, status, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'India', '9000000000', 1, ?, 'approved', ?, ?)`
           );
-
-          for (const r of regs) {
-            if (!r || !r.id || deletedIds.has(String(r.id))) continue;
-            const fullName = r.full_name_enc
-              ? decryptText(r.full_name_enc, creds.key)
-              : r.full_name || "";
-            const fatherName = r.father_name_enc
-              ? decryptText(r.father_name_enc, creds.key)
-              : r.father_name || null;
-            const currentAddress = r.current_address_enc
-              ? decryptText(r.current_address_enc, creds.key)
-              : r.current_address || "India";
-            const phoneNumber = r.phone_number_enc
-              ? decryptText(r.phone_number_enc, creds.key)
-              : r.phone_number || "9000000000";
-
-            if (!fullName) continue;
-
-            try {
-              upsertRegStmt.run(
-                String(r.id),
-                r.family_id ? String(r.family_id) : null,
-                String(fullName),
-                fatherName ? String(fatherName) : null,
-                Math.max(1, Number(r.member_count) || 1),
-                String(r.state_code || "8"),
-                String(r.district_code || "94"),
-                String(r.subdistrict_code || "6033"),
-                r.village_code ? String(r.village_code) : null,
-                String(r.thikana || ""),
-                r.thikana_same_as_village === false ? 0 : 1,
-                String(currentAddress),
-                String(phoneNumber),
-                1,
-                String(r.public_visibility || "default"),
-                String(r.status || "approved"),
-                r.admin_note ? String(r.admin_note) : null,
-                r.created_at || new Date().toISOString(),
-                r.updated_at || r.created_at || new Date().toISOString()
-              );
-              hydratedCount += 1;
-            } catch {
-              // Ignore individual row conflict if duplicate phone+name+district exists under another id
-            }
-
-            if (r.family_id && r.village_code) {
-              const seqPart = Number(
-                String(r.family_id).split("-")[1]?.replace(/\D/g, "") || 0
-              );
-              if (seqPart > 0) {
-                upsertCounterStmt.run(
-                  String(r.village_code),
-                  seqPart,
-                  r.updated_at || new Date().toISOString()
-                );
-              }
-            }
-          }
-
-          const upsertAuditStmt = db.prepare(
-            `INSERT OR IGNORE INTO registration_audit_log (
-               id, registration_id, family_id, action, changed_fields,
-               previous_values, new_values, admin_note, created_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          );
-          for (const a of audits) {
-            if (!a || !a.id) continue;
-            upsertAuditStmt.run(
-              String(a.id),
-              String(a.registration_id || ""),
-              String(a.family_id || ""),
-              String(a.action || "updated"),
-              typeof a.changed_fields === "string"
-                ? a.changed_fields
-                : JSON.stringify(a.changed_fields || []),
-              typeof a.previous_values === "string"
-                ? a.previous_values
-                : JSON.stringify(a.previous_values || {}),
-              typeof a.new_values === "string"
-                ? a.new_values
-                : JSON.stringify(a.new_values || {}),
-              a.admin_note || null,
-              a.created_at || new Date().toISOString()
+          for (const fam of rpcData.families) {
+            if (!fam || !fam.family_id) continue;
+            if (checkStmt.get(String(fam.family_id))) continue;
+            const createdAt = fam.created_at || new Date().toISOString();
+            insertRpcStmt.run(
+              `rpc-${fam.family_id}`,
+              String(fam.family_id),
+              String(fam.family_head_name || fam.head_name || "पंजीकृत परिवार"),
+              fam.father_name ? String(fam.father_name) : null,
+              Math.max(1, Number(fam.member_count) || 1),
+              String(fam.state_code || "8"),
+              String(fam.district_code || "94"),
+              String(fam.subdistrict_code || "6033"),
+              fam.village_code ? String(fam.village_code) : null,
+              String(fam.village_name || fam.official_village_name || ""),
+              fam.is_private ? "private" : "default",
+              createdAt,
+              createdAt
             );
+            hydratedCount += 1;
           }
-
-          const upsertReportStmt = db.prepare(
-            `INSERT OR IGNORE INTO missing_location_reports (
-               id, reporter_name, reporter_phone, state_code, district_code,
-               subdistrict_code, missing_level, proposed_name, parent_context,
-               pincode, notes, status, created_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          );
-          for (const rep of reports) {
-            if (!rep || !rep.id) continue;
-            const repPhone = rep.reporter_phone_enc
-              ? decryptText(rep.reporter_phone_enc, creds.key)
-              : rep.reporter_phone || null;
-            upsertReportStmt.run(
-              String(rep.id),
-              String(rep.reporter_name || ""),
-              repPhone || null,
-              rep.state_code || null,
-              rep.district_code || null,
-              rep.subdistrict_code || null,
-              String(rep.missing_level || "village"),
-              String(rep.proposed_name || ""),
-              rep.parent_context || null,
-              rep.pincode || null,
-              rep.notes || null,
-              String(rep.status || "pending"),
-              rep.created_at || new Date().toISOString()
-            );
-          }
-
-          db.exec("COMMIT");
-        } catch (txErr) {
-          try {
-            db.exec("ROLLBACK");
-          } catch {
-            // ignore
-          }
-          throw txErr;
         }
+      } catch {
+        // Ignore if RPC not yet migrated
       }
-    }
 
-    lastHydratedAt = Date.now();
-    return {
-      hydrated: true,
-      hydratedFromStore,
-      hydratedCount,
-    };
-  } catch (err) {
-    return {
-      hydrated: false,
-      error: err?.message || "Failed to hydrate from PostgreSQL",
-    };
-  }
+      lastHydratedAt = Date.now();
+      return {
+        hydrated: true,
+        hydratedFromStore,
+        hydratedCount,
+      };
+    } catch (err) {
+      return {
+        hydrated: false,
+        error: err?.message || "Failed to hydrate from PostgreSQL",
+      };
+    } finally {
+      inFlightHydrationPromise = null;
+    }
+  })();
+
+  return inFlightHydrationPromise;
 }
 
 /**
  * Serializes and saves the current SQLite Parivaar state (`parivaar_registrations`,
  * `village_family_id_counters`, `registration_audit_log`, `missing_location_reports`)
- * into PostgreSQL (`public.site_content` key `parivaar_pg_store_v1`) with AES-256-GCM
- * encryption for all private fields (`phone_number`, `current_address`, and private records).
+ * into PostgreSQL (`public.site_content` key `parivaar_pg_store_v1`) AND Supabase Storage
+ * (`gallery/_system/parivaar_pg_store_v1.json`) with AES-256-GCM encryption for all
+ * private fields (`phone_number`, `current_address`, and private records).
  */
 export async function syncDatabaseStateToPostgres(
   db,
@@ -364,23 +461,23 @@ export async function syncDatabaseStateToPostgres(
 
   try {
     let existingDeletedIds = [];
-    const { data: existingRow } = await withTimeout(
-      client
-        .from("site_content")
-        .select("value")
-        .eq("key", PG_STORE_KEY)
-        .maybeSingle(),
-      3000
-    );
-    if (existingRow?.value) {
-      try {
+    try {
+      const { data: existingRow } = await withTimeout(
+        client
+          .from("site_content")
+          .select("value")
+          .eq("key", PG_STORE_KEY)
+          .maybeSingle(),
+        2500
+      );
+      if (existingRow?.value) {
         const parsed = JSON.parse(existingRow.value);
         if (Array.isArray(parsed?.deleted_ids)) {
           existingDeletedIds = parsed.deleted_ids;
         }
-      } catch {
-        // ignore
       }
+    } catch {
+      // ignore
     }
     if (deletedId && !existingDeletedIds.includes(String(deletedId))) {
       existingDeletedIds.push(String(deletedId));
@@ -470,18 +567,63 @@ export async function syncDatabaseStateToPostgres(
       missing_reports: missingReports,
     };
 
-    const { error: upsertErr } = await withTimeout(
-      client
-        .from("site_content")
-        .upsert(
-          { key: PG_STORE_KEY, value: JSON.stringify(payload) },
-          { onConflict: "key" }
-        ),
-      3500
-    );
+    const serializedPayload = JSON.stringify(payload);
 
-    lastHydratedAt = Date.now();
-    return { ok: !upsertErr, error: upsertErr || null };
+    let siteContentSaved = false;
+    let storageSaved = false;
+    let lastError = null;
+
+    try {
+      const { error: upsertErr } = await withTimeout(
+        client
+          .from("site_content")
+          .upsert(
+            { key: PG_STORE_KEY, value: serializedPayload },
+            { onConflict: "key" }
+          ),
+        3000
+      );
+      if (!upsertErr) {
+        siteContentSaved = true;
+      } else {
+        lastError = upsertErr;
+      }
+    } catch (e) {
+      lastError = e;
+    }
+
+    try {
+      const { error: uploadErr } = await withTimeout(
+        client.storage
+          .from(STORAGE_BUCKET)
+          .upload(
+            STORAGE_OBJECT_PATH,
+            Buffer.from(serializedPayload, "utf8"),
+            {
+              contentType: "application/json",
+              upsert: true,
+            }
+          ),
+        3000
+      );
+      if (!uploadErr) {
+        storageSaved = true;
+      } else if (!lastError) {
+        lastError = uploadErr;
+      }
+    } catch (e) {
+      if (!lastError) lastError = e;
+    }
+
+    if (siteContentSaved || storageSaved) {
+      lastHydratedAt = Date.now();
+    }
+    return {
+      ok: siteContentSaved || storageSaved,
+      site_content_saved: siteContentSaved,
+      storage_saved: storageSaved,
+      error: siteContentSaved || storageSaved ? null : lastError,
+    };
   } catch (err) {
     return { ok: false, error: err };
   }

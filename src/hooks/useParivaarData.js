@@ -252,13 +252,17 @@ export function useParivaarLocations() {
       stateCode = "",
       districtCode = "",
       subdistrictCode = "",
+      villageCode = "",
+      onlyWithRegistrations = false,
       search = "",
       page = 1,
       pageSize = 15,
     }) => {
       const effectiveLevel =
         level ||
-        (subdistrictCode || districtCode || stateCode || search.trim() ? "villages" : "villages");
+        (villageCode || subdistrictCode || districtCode || stateCode || search.trim()
+          ? "villages"
+          : "villages");
 
       const params = new URLSearchParams({
         action: "directory",
@@ -269,6 +273,8 @@ export function useParivaarLocations() {
       if (stateCode) params.set("state_code", String(stateCode).trim());
       if (districtCode) params.set("district_code", String(districtCode).trim());
       if (subdistrictCode) params.set("subdistrict_code", String(subdistrictCode).trim());
+      if (villageCode) params.set("village_code", String(villageCode).trim());
+      if (onlyWithRegistrations) params.set("only_with_registrations", "1");
       if (search.trim()) params.set("q", search.trim());
 
       const data = await fetchJsonApi(`/api/parivaar?${params.toString()}`);
@@ -345,6 +351,7 @@ export function useParivaarLocations() {
 export function useParivaarDirectory() {
   const [stats, setStats] = useState(EMPTY_STATS);
   const [aggregates, setAggregates] = useState(EMPTY_AGGREGATES);
+  const [publicFamilies, setPublicFamilies] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [dbStatus, setDbStatus] = useState("checking"); // 'connected' | 'migration_pending' | 'unconfigured' | 'error'
   const [dbError, setDbError] = useState(null);
@@ -356,6 +363,33 @@ export function useParivaarDirectory() {
   const [directoryRefreshTick, setDirectoryRefreshTick] = useState(0);
   const submitLockRef = useRef(false);
 
+  const applyConsistentSnapshot = useCallback((snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") return;
+    const rawStats = snapshot.summary || {};
+    const rawAgg = snapshot.aggregates || {};
+    const rawPub = snapshot.public_families || {};
+
+    setStats({
+      total_registrations: Number(rawStats.total_registrations) || 0,
+      total_members: Number(rawStats.total_members) || 0,
+      states_represented: Number(rawStats.states_represented) || 0,
+      districts_covered: Number(rawStats.districts_covered) || 0,
+      villages_represented: Number(rawStats.villages_represented) || 0,
+      lgd_totals: rawStats.lgd_totals || EMPTY_STATS.lgd_totals,
+    });
+
+    setAggregates({
+      states: Array.isArray(rawAgg.states) ? rawAgg.states : [],
+      districts: Array.isArray(rawAgg.districts) ? rawAgg.districts : [],
+      subdistricts: Array.isArray(rawAgg.subdistricts) ? rawAgg.subdistricts : [],
+      villages: Array.isArray(rawAgg.villages) ? rawAgg.villages : [],
+    });
+
+    if (Array.isArray(rawPub.families)) {
+      setPublicFamilies(rawPub.families);
+    }
+  }, []);
+
   const loadStatsAndAggregates = useCallback(
     (stateFilter = null, districtFilter = null) =>
       Promise.resolve()
@@ -366,24 +400,7 @@ export function useParivaarDirectory() {
           if (districtFilter) params.set("district_code", String(districtFilter).trim());
 
           const data = await fetchJsonApi(`/api/parivaar?${params.toString()}`);
-          const rawStats = data.summary || {};
-          const rawAgg = data.aggregates || {};
-
-          setStats({
-            total_registrations: Number(rawStats.total_registrations) || 0,
-            total_members: Number(rawStats.total_members) || 0,
-            states_represented: Number(rawStats.states_represented) || 0,
-            districts_covered: Number(rawStats.districts_covered) || 0,
-            villages_represented: Number(rawStats.villages_represented) || 0,
-            lgd_totals: rawStats.lgd_totals || EMPTY_STATS.lgd_totals,
-          });
-
-          setAggregates({
-            states: Array.isArray(rawAgg.states) ? rawAgg.states : [],
-            districts: Array.isArray(rawAgg.districts) ? rawAgg.districts : [],
-            subdistricts: Array.isArray(rawAgg.subdistricts) ? rawAgg.subdistricts : [],
-            villages: Array.isArray(rawAgg.villages) ? rawAgg.villages : [],
-          });
+          applyConsistentSnapshot(data);
 
           setDbStatus("connected");
           setDbError(null);
@@ -396,7 +413,7 @@ export function useParivaarDirectory() {
           setDbError(err?.message || "Unable to reach database.");
           setLoadingStats(false);
         }),
-    []
+    [applyConsistentSnapshot]
   );
 
   useEffect(() => {
@@ -510,6 +527,10 @@ export function useParivaarDirectory() {
           return { ok: false, error: errObj };
         }
 
+        if (data?.snapshot) {
+          applyConsistentSnapshot(data.snapshot);
+        }
+
         setSavedRegistration(
           data.registration || {
             id: data.id,
@@ -547,7 +568,7 @@ export function useParivaarDirectory() {
         return { ok: false, error: errObj };
       }
     },
-    [loadStatsAndAggregates]
+    [applyConsistentSnapshot, loadStatsAndAggregates]
   );
 
   /**
@@ -617,6 +638,7 @@ export function useParivaarDirectory() {
   return {
     stats,
     aggregates,
+    publicFamilies,
     loadingStats,
     dbStatus,
     dbError,
