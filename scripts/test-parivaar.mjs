@@ -931,14 +931,36 @@ check("8. [Production Bug 1 & Bug 2] Keyless Esri map provider without CARTO wat
     false,
     "useParivaarData.js must never call .catch() directly on supabase.rpc() (PostgrestFilterBuilder)"
   );
-  assert.ok(
-    hookSrc.includes('callSupabaseRpc(\n            "submit_parivaar_registration"') ||
-      hookSrc.includes('callSupabaseRpc("submit_parivaar_registration"'),
-    "useParivaarData.js must use async/await via callSupabaseRpc for submit_parivaar_registration"
+  // Registration writes are owned by the server (one PostgreSQL transaction)
+  // so the browser no longer issues a second, duplicate RPC write.
+  assert.equal(
+    hookSrc.includes('"submit_parivaar_registration"'),
+    false,
+    "useParivaarData.js must not issue a duplicate browser-side registration RPC write"
+  );
+  assert.equal(
+    hookSrc.includes('"submit_missing_location_report"'),
+    false,
+    "useParivaarData.js must not issue a duplicate browser-side missing-location RPC write"
   );
   assert.ok(
-    hookSrc.includes('callSupabaseRpc("submit_missing_location_report"'),
-    "useParivaarData.js must use async/await via callSupabaseRpc for submit_missing_location_report"
+    hookSrc.includes("/api/parivaar?action=register"),
+    "Registration must be submitted through the server API which owns the database transaction"
+  );
+
+  const registrationModuleSrc = fs.readFileSync(
+    path.join(ROOT, "server/parivaarRegistration.mjs"),
+    "utf8"
+  );
+  assert.ok(
+    registrationModuleSrc.includes('client.rpc("submit_parivaar_registration"') &&
+      registrationModuleSrc.includes("withTimeout("),
+    "server/parivaarRegistration.mjs must call the registration RPC through an awaited, time-bounded helper"
+  );
+  assert.ok(
+    registrationModuleSrc.includes("idempotency") &&
+      registrationModuleSrc.includes("applyPostgresRegistrationToReplica"),
+    "server/parivaarRegistration.mjs must implement idempotency and mirror the committed record into the replica"
   );
 
   const adminTabSrc = fs.readFileSync(
@@ -1165,6 +1187,217 @@ check("9. [Chhapawda Data Consistency Fix] Existing Chhapawda registration (9449
   assert.equal(finalConsistency.directory_members, 3);
 });
 
+check("10. [Performance & Real-Time Sync] Server-side validation dry-run, idempotent submissions, database-issued Family IDs, revision endpoint, degraded-mode safety, and static LGD caching", async () => {
+  const http = await import("node:http");
+  const { handleParivaarApiRequest } = await import("../server/parivaarApiHandler.mjs");
+  const { applyPostgresRegistrationToReplica } = await import("../server/parivaarDatabase.mjs");
+
+  const db = getParivaarDb();
+  cleanTestArtifacts(db, { keepBaseline: false });
+  ensureBaselineRegistrations(db);
+
+  const basePayload = {
+    full_name: "TEST_VERIFICATION_Perf_Sync_Family",
+    father_name: "Perf_Sync_Father",
+    require_father_name: true,
+    member_count: 4,
+    state_code: "8",
+    district_code: "94",
+    subdistrict_code: "6033",
+    village_code: "94494",
+    thikana: "Chhapawda",
+    thikana_same_as_village: true,
+    require_village: true,
+    current_address: "Test address, Amritsar",
+    phone_number: "9812345670",
+    consent_given: true,
+  };
+
+  // 10a. Dry-run validation must not write anything
+  const beforeDryRun = db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt;
+  const dryRun = insertParivaarRegistration(basePayload, db, { dryRun: true });
+  assert.equal(dryRun.ok, true);
+  assert.equal(dryRun.dry_run, true);
+  assert.equal(dryRun.normalized.fullName, "TEST_VERIFICATION_Perf_Sync_Family");
+  assert.equal(dryRun.normalized.villageName, "Chhapawda");
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt,
+    beforeDryRun,
+    "Dry-run validation must never write a registration row"
+  );
+
+  const rejectedDryRun = insertParivaarRegistration(
+    { ...basePayload, phone_number: "1234567890" },
+    db,
+    { dryRun: true }
+  );
+  assert.equal(rejectedDryRun.ok, false);
+  assert.equal(rejectedDryRun.code, "INVALID_PHONE");
+
+  // 10b. Idempotency: a retried submission resolves to the same family
+  const idempotentPayload = { ...basePayload, idempotency_key: "test-idempotency-key-0001" };
+  const firstSave = insertParivaarRegistration(idempotentPayload, db);
+  assert.equal(firstSave.ok, true);
+  const secondSave = insertParivaarRegistration(idempotentPayload, db);
+  assert.equal(secondSave.ok, true);
+  assert.equal(secondSave.idempotent_replay, true);
+  assert.equal(secondSave.family_id, firstSave.family_id);
+  assert.equal(
+    db
+      .prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations WHERE idempotency_key = ?")
+      .get("test-idempotency-key-0001").cnt,
+    1,
+    "Idempotent replay must not create a second registration row"
+  );
+
+  // 10c. A PostgreSQL-issued Family ID is adopted as-is and never duplicated
+  const pgRecord = {
+    id: "11111111-2222-3333-4444-555555555555",
+    family_id: "94494-777",
+    full_name: "TEST_VERIFICATION_Database_Issued_Family",
+    father_name: "Database Father",
+    member_count: 2,
+    state_code: "8",
+    district_code: "94",
+    subdistrict_code: "6033",
+    village_code: "94494",
+    created_at: new Date().toISOString(),
+  };
+  const mirrored = applyPostgresRegistrationToReplica(db, pgRecord, {
+    currentAddress: "Test address",
+    phone: "9812345671",
+    publicVisibility: "default",
+  });
+  assert.equal(mirrored.ok, true);
+  assert.equal(mirrored.family_id, "94494-777", "The database-issued Family ID must be preserved");
+  assert.equal(
+    db.prepare("SELECT family_id FROM parivaar_registrations WHERE id = ?").get(pgRecord.id).family_id,
+    "94494-777"
+  );
+
+  // Re-applying the same family under a different internal id must update, not duplicate
+  const beforeRebase = db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt;
+  const rebased = applyPostgresRegistrationToReplica(
+    db,
+    { ...pgRecord, id: "99999999-8888-7777-6666-555555555555" },
+    { currentAddress: "Updated address", phone: "9812345671" }
+  );
+  assert.equal(rebased.family_id, "94494-777");
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt,
+    beforeRebase,
+    "The same family must never be counted twice"
+  );
+
+  // 10d. HTTP contract: revision endpoint, cache headers, and no stale-success behaviour
+  const server = http.createServer((req, res) => {
+    handleParivaarApiRequest(req, res).catch(() => {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const api = (query) => fetch(`http://127.0.0.1:${port}/api/parivaar?${query}`);
+
+  try {
+    const summaryRes = await api("action=summary");
+    assert.equal(summaryRes.status, 200);
+    const summaryBody = await summaryRes.json();
+    assert.equal(summaryBody.ok, true);
+    assert.equal(summaryBody.degraded, false, "A healthy local replica must not be reported as degraded");
+    assert.ok(Number(summaryBody.stats.total_registrations) >= 3);
+
+    const revisionRes = await api("action=revision");
+    const revisionBody = await revisionRes.json();
+    assert.equal(revisionBody.ok, true);
+    assert.equal(typeof revisionBody.total_registrations, "number");
+    assert.equal(revisionBody.unchanged, false);
+
+    const unchangedRes = await api(
+      `action=revision&revision=${encodeURIComponent(revisionBody.revision || "none")}`
+    );
+    const unchangedBody = await unchangedRes.json();
+    assert.equal(
+      unchangedBody.unchanged,
+      Boolean(revisionBody.revision),
+      "Passing the current revision must be reported as unchanged"
+    );
+
+    const statesRes = await api("action=states");
+    const cacheControl = statesRes.headers.get("cache-control") || "";
+    assert.ok(
+      cacheControl.includes("s-maxage"),
+      "Immutable LGD location data must be cacheable at the CDN edge"
+    );
+    const statesBody = await statesRes.json();
+    assert.equal(statesBody.states.length, 36);
+    const statesAgain = await (await api("action=states")).json();
+    assert.equal(statesAgain.states.length, 36, "Cached location responses must stay complete");
+
+    const liveRes = await api("action=public-families&village_code=94494");
+    const liveCacheControl = liveRes.headers.get("cache-control") || "";
+    assert.ok(
+      liveCacheControl.includes("no-store"),
+      "Live registration data must never be cached"
+    );
+
+    // 10e. Degraded mode: an unreachable database must produce a warning and
+    //      must NOT be reported as "0 registrations".
+    const previousUrl = process.env.SUPABASE_URL;
+    const previousKey = process.env.SUPABASE_ANON_KEY;
+    process.env.SUPABASE_URL = "http://127.0.0.1:1";
+    process.env.SUPABASE_ANON_KEY = "test-key";
+    try {
+      const degradedRes = await api("action=summary");
+      const degradedBody = await degradedRes.json();
+      assert.equal(degradedBody.ok, true);
+      assert.equal(degradedBody.degraded, true, "A database outage must be surfaced as degraded");
+      assert.ok(
+        String(degradedBody.data_warning || "").length > 0,
+        "A database outage must produce an explicit warning message"
+      );
+      assert.ok(
+        Number(degradedBody.stats.total_registrations) >= 3,
+        "A database outage must never be converted into 0 registrations"
+      );
+    } finally {
+      if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = previousUrl;
+      if (previousKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+      else process.env.SUPABASE_ANON_KEY = previousKey;
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    cleanTestArtifacts(db, { keepBaseline: true });
+    db.prepare(
+      "UPDATE village_family_id_counters SET last_seq = 1 WHERE village_code = '94494'"
+    ).run();
+  }
+
+  // After cleanup only the verified Chhapawda family remains
+  const finalCheck = verifyParivaarDataConsistency(db);
+  assert.equal(finalCheck.consistent, true);
+  assert.equal(finalCheck.summary_families, 1);
+  assert.equal(finalCheck.summary_members, 3);
+
+  // 10f. Schema indexes exist for the live query shapes
+  const indexNames = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+    .all()
+    .map((row) => row.name);
+  for (const requiredIndex of [
+    "parivaar_reg_family_id_uidx",
+    "parivaar_reg_status_village_idx",
+    "parivaar_reg_status_district_idx",
+    "parivaar_reg_idempotency_uidx",
+    "villages_subdistrict_code_idx",
+    "villages_name_en_idx",
+  ]) {
+    assert.ok(indexNames.includes(requiredIndex), `Missing required index: ${requiredIndex}`);
+  }
+});
+
 console.log("==============================================================");
-console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency fixes) passed!`);
+console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency + Performance/Real-Time Sync) passed!`);
 console.log("==============================================================");

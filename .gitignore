@@ -12,6 +12,8 @@ dist
 dist-ssr
 .cache
 *.sqlite
+# Pre-built LGD reference database (generated at build time, never committed)
+data/lgd/*.sqlite.gz
 *.sqlite-shm
 *.sqlite-wal
 *.local

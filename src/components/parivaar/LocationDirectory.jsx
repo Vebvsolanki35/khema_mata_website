@@ -273,10 +273,11 @@ function LocationDirectory({
       })
       .catch((err) => {
         if (!active) return;
-        setRows([]);
-        setTotalCount(0);
+        // Keep the previously loaded rows and totals: an API/database failure
+        // must never be presented as "no registrations found".
         setDirError(
-          err?.message || "Failed to load directory records from database."
+          err?.message ||
+            "Unable to load directory records from the database. Please retry."
         );
         setLoading(false);
       });
@@ -335,11 +336,11 @@ function LocationDirectory({
       })
       .catch((err) => {
         if (!active) return;
-        setFamilies([]);
-        setTotalFamilies(0);
-        setTotalMembersInFilter(0);
+        // Preserve the last successful listing; surface the failure instead of
+        // showing a misleading empty directory.
         setFamilyError(
-          err?.message || "Failed to load public family listings."
+          err?.message ||
+            "Unable to load family listings from the database. Please retry."
         );
         setLoadingFamilies(false);
       });

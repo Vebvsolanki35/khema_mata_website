@@ -119,9 +119,13 @@ function Parivaar() {
     aggregates,
     publicFamilies,
     loadingStats,
+    refreshing,
     dbStatus,
     dbError,
+    degraded,
+    dataWarning,
     reloadStats,
+    refreshNow,
     submitRegistration,
     submitMissingLocation,
     resetSubmission,
@@ -459,7 +463,7 @@ function Parivaar() {
             ))}
           </div>
 
-          {!loadingStats && stats.total_registrations === 0 && (
+          {!loadingStats && !degraded && stats.total_registrations === 0 && (
             <div
               className="mt-4 rounded-xl px-3.5 py-2.5 text-center text-xs sm:text-sm font-medium"
               style={{
@@ -472,7 +476,7 @@ function Parivaar() {
             </div>
           )}
 
-          {(statesError || dbError) && (
+          {(statesError || dbError || dataWarning) && (
             <div
               className="mt-4 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold"
               style={{
@@ -482,12 +486,17 @@ function Parivaar() {
               }}
               role="alert"
             >
-              <span>⚠️ {statesError || dbError}</span>
+              <span>⚠️ {statesError || dbError || dataWarning}</span>
+              {refreshing && (
+                <span className="text-[11px] font-medium opacity-70">
+                  रीफ़्रेश हो रहा है… (Refreshing…)
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   retryStates?.();
-                  reloadStats?.();
+                  refreshNow?.() || reloadStats?.();
                 }}
                 className="px-3.5 py-2 rounded-lg text-xs font-bold"
                 style={{
