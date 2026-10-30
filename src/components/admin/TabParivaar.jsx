@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { supabase, safeSupabaseQuery } from "../../lib/supabase";
 
 const STATUSES = ["approved", "pending", "rejected", "archived", "flagged", "deleted"];
 const REPORT_STATUSES = ["pending", "reviewed", "imported", "rejected"];
@@ -151,11 +151,12 @@ function TabParivaar() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.message || "Failed to update status");
       }
-      await supabase
-        .from("parivaar_registrations")
-        .update({ status })
-        .eq("id", id)
-        .catch(() => {});
+      await safeSupabaseQuery(
+        supabase
+          .from("parivaar_registrations")
+          .update({ status })
+          .eq("id", id)
+      );
       loadData();
     } catch (err) {
       setError(err?.message || "Failed to update registration status");
@@ -197,6 +198,25 @@ function TabParivaar() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.message || "Failed to save record changes");
       }
+      await safeSupabaseQuery(
+        supabase
+          .from("parivaar_registrations")
+          .update({
+            full_name: editingRecord.full_name,
+            father_name: editingRecord.father_name || null,
+            member_count: Number(editingRecord.member_count) || 1,
+            phone_number: editingRecord.phone_number,
+            current_address: editingRecord.current_address,
+            state_code: editingRecord.state_code,
+            district_code: editingRecord.district_code,
+            subdistrict_code: editingRecord.subdistrict_code,
+            village_code: editingRecord.village_code,
+            thikana: editingRecord.thikana,
+            public_visibility: editingRecord.public_visibility || "public",
+            status: editingRecord.status || "approved",
+          })
+          .eq("id", editingRecord.id)
+      );
       setEditingRecord(null);
       setEditReason("");
       loadData();
@@ -229,11 +249,12 @@ function TabParivaar() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.message || "Failed to delete registration");
       }
-      await supabase
-        .from("parivaar_registrations")
-        .delete()
-        .eq("id", row.id)
-        .catch(() => {});
+      await safeSupabaseQuery(
+        supabase
+          .from("parivaar_registrations")
+          .delete()
+          .eq("id", row.id)
+      );
       loadData();
     } catch (err) {
       setError(err?.message || "Failed to delete registration");
@@ -257,11 +278,12 @@ function TabParivaar() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.message || "Failed to update report status");
       }
-      await supabase
-        .from("missing_location_reports")
-        .update({ status })
-        .eq("id", id)
-        .catch(() => {});
+      await safeSupabaseQuery(
+        supabase
+          .from("missing_location_reports")
+          .update({ status })
+          .eq("id", id)
+      );
       loadData();
     } catch (err) {
       setError(err?.message || "Failed to update report status");

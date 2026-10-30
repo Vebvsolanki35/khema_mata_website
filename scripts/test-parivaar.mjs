@@ -724,8 +724,22 @@ check("6. Map tile configuration, LGD Data-Quality Report, Navigation preservati
     path.join(ROOT, "src/components/parivaar/CommunityMap.jsx"),
     "utf8"
   );
-  assert.equal(mapCode.includes("tile.openstreetmap.org/{z}"), false);
-  assert.ok(mapCode.includes("basemaps.cartocdn.com/rastertiles/voyager"));
+  assert.ok(
+    mapCode.includes(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+    ),
+    "CommunityMap must use keyless Esri World Street Map as primary tile provider"
+  );
+  assert.ok(
+    mapCode.includes(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+    ),
+    "CommunityMap must configure Esri World Topographic Map as automatic fallback"
+  );
+  assert.ok(
+    mapCode.includes("maxZoom: 18"),
+    "CommunityMap must support zoom levels up to 18"
+  );
 
   const ids = SECTIONS.map((s) => s.id);
   assert.deepEqual(ids, ["home", "heritage", "darshan", "visit", "seva", "parivaar"]);
@@ -896,6 +910,67 @@ check("7. Father's Name (`father_name`) end-to-end: registration validation, DB 
   }
 });
 
+// 8. Production Bug Fix Regression Suite: Keyless Map Tiles (No CARTO Watermark) & PostgrestFilterBuilder RPC Handling (`l.rpc(...).catch is not a function`)
+check("8. [Production Bug 1 & Bug 2] Keyless Esri map provider without CARTO watermark & safe async/await Supabase RPC handling (zero `.rpc(...).catch` calls)", () => {
+  // 8a. Verify no `.rpc(...).catch` or `supabase.from(...).catch` exists in frontend/backend code
+  const hookSrc = fs.readFileSync(
+    path.join(ROOT, "src/hooks/useParivaarData.js"),
+    "utf8"
+  );
+  assert.equal(
+    /\.rpc\([\s\S]*?\)\.catch/.test(hookSrc),
+    false,
+    "useParivaarData.js must never call .catch() directly on supabase.rpc() (PostgrestFilterBuilder)"
+  );
+  assert.ok(
+    hookSrc.includes('callSupabaseRpc(\n            "submit_parivaar_registration"') ||
+      hookSrc.includes('callSupabaseRpc("submit_parivaar_registration"'),
+    "useParivaarData.js must use async/await via callSupabaseRpc for submit_parivaar_registration"
+  );
+  assert.ok(
+    hookSrc.includes('callSupabaseRpc("submit_missing_location_report"'),
+    "useParivaarData.js must use async/await via callSupabaseRpc for submit_missing_location_report"
+  );
+
+  const adminTabSrc = fs.readFileSync(
+    path.join(ROOT, "src/components/admin/TabParivaar.jsx"),
+    "utf8"
+  );
+  assert.equal(
+    /supabase[\s\S]{0,120}\.catch\(/.test(adminTabSrc),
+    false,
+    "TabParivaar.jsx must never call .catch() on a Supabase PostgrestFilterBuilder"
+  );
+
+  const supabaseLibSrc = fs.readFileSync(
+    path.join(ROOT, "src/lib/supabase.js"),
+    "utf8"
+  );
+  assert.ok(
+    supabaseLibSrc.includes("export async function callSupabaseRpc") &&
+      supabaseLibSrc.includes("await supabase.rpc(fnName, params)"),
+    "src/lib/supabase.js must export callSupabaseRpc using await supabase.rpc(fnName, params)"
+  );
+
+  // 8b. Verify PostgreSQL migration defines extended submit_parivaar_registration RPC with father_name, member_count, family_id
+  const migrationSrc = fs.readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20261030100000_fix_parivaar_rpc_and_persistence.sql"
+    ),
+    "utf8"
+  );
+  assert.ok(
+    migrationSrc.includes("create or replace function public.submit_parivaar_registration") &&
+      migrationSrc.includes("p_father_name") &&
+      migrationSrc.includes("p_member_count") &&
+      migrationSrc.includes("p_family_id") &&
+      migrationSrc.includes("public.village_family_id_counters") &&
+      migrationSrc.includes("create or replace function public.get_public_parivaar_families"),
+    "PostgreSQL migration must update submit_parivaar_registration with p_father_name, p_member_count, p_family_id, and village_family_id_counters"
+  );
+});
+
 console.log("==============================================================");
-console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name flows) passed!`);
+console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 fixes) passed!`);
 console.log("==============================================================");

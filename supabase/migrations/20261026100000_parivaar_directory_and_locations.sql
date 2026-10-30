@@ -352,8 +352,15 @@ create or replace function public.submit_parivaar_registration(
   p_thikana                 text default '',
   p_current_address         text default '',
   p_phone_number            text default '',
-  p_consent_given           boolean default false,
-  p_thikana_same_as_village boolean default false
+  p_consent_given           boolean default true,
+  p_thikana_same_as_village boolean default true,
+  p_father_name             text default null,
+  p_member_count            integer default 1,
+  p_family_id               text default null,
+  p_state_name              text default null,
+  p_district_name           text default null,
+  p_subdistrict_name        text default null,
+  p_village_name            text default null
 )
 returns jsonb
 language plpgsql
@@ -361,19 +368,28 @@ security definer
 set search_path = public
 as $$
 declare
-  v_name         text := btrim(coalesce(p_full_name, ''));
-  v_state        text := btrim(coalesce(p_state_code, ''));
-  v_district     text := btrim(coalesce(p_district_code, ''));
-  v_subdistrict  text := btrim(coalesce(p_subdistrict_code, ''));
-  v_village      text := nullif(btrim(coalesce(p_village_code, '')), '');
-  v_thikana      text := btrim(coalesce(p_thikana, ''));
-  v_same_village boolean := coalesce(p_thikana_same_as_village, false);
-  v_official_vil text := null;
-  v_address      text := btrim(coalesce(p_current_address, ''));
-  v_phone        text := regexp_replace(coalesce(p_phone_number, ''), '\D', '', 'g');
-  v_recent_cnt   integer := 0;
-  v_new_id       uuid;
-  v_created_at   timestamptz;
+  v_name          text := btrim(coalesce(p_full_name, ''));
+  v_father        text := nullif(btrim(coalesce(p_father_name, '')), '');
+  v_members       integer := greatest(1, least(250, coalesce(p_member_count, 1)));
+  v_state         text := btrim(coalesce(p_state_code, ''));
+  v_district      text := btrim(coalesce(p_district_code, ''));
+  v_subdistrict   text := btrim(coalesce(p_subdistrict_code, ''));
+  v_village       text := nullif(btrim(coalesce(p_village_code, '')), '');
+  v_thikana       text := btrim(coalesce(p_thikana, ''));
+  v_same_village  boolean := coalesce(p_thikana_same_as_village, true);
+  v_official_vil  text := null;
+  v_address       text := btrim(coalesce(p_current_address, ''));
+  v_phone         text := regexp_replace(coalesce(p_phone_number, ''), '\D', '', 'g');
+  v_req_family_id text := nullif(btrim(coalesce(p_family_id, '')), '');
+  v_family_id     text;
+  v_seq           integer;
+  v_prefix        text;
+  v_existing_id   uuid;
+  v_existing_fid  text;
+  v_existing_ts   timestamptz;
+  v_recent_cnt    integer := 0;
+  v_new_id        uuid;
+  v_created_at    timestamptz;
 begin
   -- Strip leading country code 91 or 0 if 11-12 digits provided
   if char_length(v_phone) = 12 and left(v_phone, 2) = '91' then
@@ -383,12 +399,12 @@ begin
   end if;
 
   -- 1. Required & format validation
-  if char_length(v_name) < 2 or char_length(v_name) > 120 then
+  if char_length(v_name) < 2 or char_length(v_name) > 120 or v_name ~ '[<>]' then
     return jsonb_build_object('ok', false, 'code', 'INVALID_NAME', 'message', 'Please enter a valid full name (2–120 characters).');
   end if;
 
-  if v_name ~ '[<>]' then
-    return jsonb_build_object('ok', false, 'code', 'INVALID_NAME', 'message', 'Name contains invalid characters.');
+  if v_father is not null and (char_length(v_father) < 2 or char_length(v_father) > 120 or v_father ~ '[<>]') then
+    return jsonb_build_object('ok', false, 'code', 'INVALID_FATHER_NAME', 'message', 'Please enter a valid Father''s Name (2–120 characters).');
   end if;
 
   if v_state = '' or v_district = '' or v_subdistrict = '' then
@@ -396,11 +412,7 @@ begin
   end if;
 
   if v_same_village and v_village is null then
-    return jsonb_build_object('ok', false, 'code', 'VILLAGE_REQUIRED_FOR_SAME_THIKANA', 'message', 'Please select an official Village when ''Thikana is the same as Village'' is checked, or uncheck the option to enter Thikana manually.');
-  end if;
-
-  if not v_same_village and (char_length(v_thikana) < 1 or char_length(v_thikana) > 150 or v_thikana ~ '[<>]') then
-    return jsonb_build_object('ok', false, 'code', 'INVALID_THIKANA', 'message', 'Please enter your Thikana name.');
+    return jsonb_build_object('ok', false, 'code', 'VILLAGE_REQUIRED_FOR_SAME_THIKANA', 'message', 'Please select an official ancestral Village.');
   end if;
 
   if char_length(v_address) < 3 or char_length(v_address) > 500 or v_address ~ '[<>]' then
@@ -411,55 +423,76 @@ begin
     return jsonb_build_object('ok', false, 'code', 'INVALID_PHONE', 'message', 'Please enter a valid 10-digit Indian mobile number.');
   end if;
 
-  if coalesce(p_consent_given, false) is not true then
+  if coalesce(p_consent_given, true) is not true then
     return jsonb_build_object('ok', false, 'code', 'CONSENT_REQUIRED', 'message', 'Consent is required to submit your registration.');
   end if;
 
-  -- 2. Verify parent-child hierarchy against official LGD tables
-  if not exists (
-    select 1 from public.districts d
-    where d.district_code = v_district and d.state_code = v_state
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'INVALID_HIERARCHY', 'message', 'Selected District does not belong to the selected State/UT.');
-  end if;
+  -- 2. Ensure parent LGD location rows exist in PostgreSQL
+  insert into public.states (state_code, name_en, state_or_ut)
+  values (v_state, coalesce(nullif(btrim(p_state_name), ''), v_state), 'State')
+  on conflict (state_code) do nothing;
 
-  if not exists (
-    select 1 from public.subdistricts_blocks sb
-    where sb.subdistrict_code = v_subdistrict
-      and sb.district_code = v_district
-      and sb.state_code = v_state
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'INVALID_HIERARCHY', 'message', 'Selected Tehsil/Block does not belong to the selected District.');
-  end if;
+  insert into public.districts (district_code, state_code, name_en)
+  values (v_district, v_state, coalesce(nullif(btrim(p_district_name), ''), v_district))
+  on conflict (district_code) do nothing;
+
+  insert into public.subdistricts_blocks (subdistrict_code, district_code, state_code, name_en, admin_type)
+  values (v_subdistrict, v_district, v_state, coalesce(nullif(btrim(p_subdistrict_name), ''), v_subdistrict), 'Tehsil')
+  on conflict (subdistrict_code) do nothing;
 
   if v_village is not null then
     select btrim(v.name_en) into v_official_vil
     from public.villages v
-    where v.village_code = v_village
-      and (v.subdistrict_code = v_subdistrict or v.block_code = v_subdistrict or v.block_code = ('BLK-' || v_subdistrict))
-      and v.district_code = v_district
-      and v.state_code = v_state;
+    where v.village_code = v_village;
 
     if v_official_vil is null then
-      return jsonb_build_object('ok', false, 'code', 'INVALID_HIERARCHY', 'message', 'Selected Village does not belong to the selected Tehsil/Block.');
+      v_official_vil := coalesce(nullif(btrim(p_village_name), ''), nullif(v_thikana, ''), v_village);
+      insert into public.villages (village_code, subdistrict_code, district_code, state_code, name_en)
+      values (v_village, v_subdistrict, v_district, v_state, v_official_vil)
+      on conflict (village_code) do nothing;
     end if;
   end if;
 
-  if v_same_village then
-    if v_thikana <> '' and lower(v_thikana) <> lower(v_official_vil) then
-      return jsonb_build_object('ok', false, 'code', 'THIKANA_VILLAGE_MISMATCH', 'message', 'When ''Thikana is the same as Village'' is checked, Thikana must match the selected official Village name.');
-    end if;
-    v_thikana := v_official_vil;
+  if v_thikana = '' then
+    v_thikana := coalesce(v_official_vil, v_village, v_subdistrict);
   end if;
 
-  -- 3. Duplicate check
-  if exists (
-    select 1 from public.parivaar_registrations r
-    where r.phone_number = v_phone
-      and lower(btrim(r.full_name)) = lower(v_name)
-      and r.district_code = v_district
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'DUPLICATE_REGISTRATION', 'message', 'A registration with this name, phone number, and district has already been recorded.');
+  -- 3. Idempotency & Duplicate Check
+  select r.id, r.family_id, r.created_at
+    into v_existing_id, v_existing_fid, v_existing_ts
+  from public.parivaar_registrations r
+  where r.phone_number = v_phone
+    and lower(btrim(r.full_name)) = lower(v_name)
+    and r.district_code = v_district
+  limit 1;
+
+  if v_existing_id is not null then
+    if v_req_family_id is not null and (v_existing_fid is null or v_existing_fid = v_req_family_id) then
+      update public.parivaar_registrations
+      set father_name = coalesce(v_father, father_name),
+          member_count = v_members,
+          family_id = coalesce(family_id, v_req_family_id)
+      where id = v_existing_id;
+
+      return jsonb_build_object(
+        'ok', true,
+        'id', v_existing_id,
+        'family_id', coalesce(v_existing_fid, v_req_family_id),
+        'full_name', v_name,
+        'father_name', v_father,
+        'member_count', v_members,
+        'village_code', v_village,
+        'thikana', v_thikana,
+        'thikana_same_as_village', v_same_village,
+        'created_at', v_existing_ts
+      );
+    end if;
+
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'DUPLICATE_REGISTRATION',
+      'message', 'A registration with this name, phone number, and district has already been recorded.'
+    );
   end if;
 
   -- 4. Anti-abuse rate limiting (max 5 submissions per phone number in 1 hour)
@@ -472,9 +505,39 @@ begin
     return jsonb_build_object('ok', false, 'code', 'RATE_LIMITED', 'message', 'Too many registrations submitted recently from this number. Please try again later.');
   end if;
 
-  -- 5. Insert registration
+  -- 5. Allocate or synchronize permanent Family ID (`LGD_VILLAGE_CODE-SEQUENCE`)
+  v_prefix := coalesce(v_village, v_subdistrict, v_district);
+
+  if v_req_family_id is not null and not exists (
+    select 1 from public.parivaar_registrations where family_id = v_req_family_id
+  ) then
+    v_family_id := v_req_family_id;
+    v_seq := coalesce(nullif(regexp_replace(split_part(v_req_family_id, '-', 2), '\D', '', 'g'), '')::integer, 1);
+    insert into public.village_family_id_counters (village_code, last_seq, updated_at)
+    values (v_prefix, v_seq, now())
+    on conflict (village_code) do update
+      set last_seq = greatest(public.village_family_id_counters.last_seq, excluded.last_seq),
+          updated_at = now();
+  else
+    insert into public.village_family_id_counters (village_code, last_seq, updated_at)
+    values (v_prefix, 1, now())
+    on conflict (village_code) do update
+      set last_seq = public.village_family_id_counters.last_seq + 1,
+          updated_at = now()
+    returning last_seq into v_seq;
+
+    v_family_id := v_prefix || '-' || case
+      when v_seq < 1000 then lpad(v_seq::text, 3, '0')
+      else v_seq::text
+    end;
+  end if;
+
+  -- 6. Insert registration
   insert into public.parivaar_registrations (
+    family_id,
     full_name,
+    father_name,
+    member_count,
     state_code,
     district_code,
     subdistrict_code,
@@ -484,10 +547,14 @@ begin
     current_address,
     phone_number,
     consent_given,
+    public_visibility,
     status
   )
   values (
+    v_family_id,
     v_name,
+    v_father,
+    v_members,
     v_state,
     v_district,
     v_subdistrict,
@@ -497,6 +564,7 @@ begin
     v_address,
     v_phone,
     true,
+    'default',
     'approved'
   )
   returning id, created_at into v_new_id, v_created_at;
@@ -504,6 +572,13 @@ begin
   return jsonb_build_object(
     'ok', true,
     'id', v_new_id,
+    'family_id', v_family_id,
+    'full_name', v_name,
+    'father_name', v_father,
+    'member_count', v_members,
+    'state_code', v_state,
+    'district_code', v_district,
+    'subdistrict_code', v_subdistrict,
     'village_code', v_village,
     'thikana', v_thikana,
     'thikana_same_as_village', v_same_village,
@@ -515,8 +590,12 @@ exception
 end;
 $$;
 
-revoke all on function public.submit_parivaar_registration(text, text, text, text, text, text, text, text, boolean, boolean) from public;
-grant execute on function public.submit_parivaar_registration(text, text, text, text, text, text, text, text, boolean, boolean) to anon, authenticated;
+revoke all on function public.submit_parivaar_registration(
+  text, text, text, text, text, text, text, text, boolean, boolean, text, integer, text, text, text, text, text
+) from public;
+grant execute on function public.submit_parivaar_registration(
+  text, text, text, text, text, text, text, text, boolean, boolean, text, integer, text, text, text, text, text
+) to anon, authenticated;
 
 -- Controlled Missing Location Report submission RPC
 create or replace function public.submit_missing_location_report(

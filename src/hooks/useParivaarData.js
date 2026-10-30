@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { callSupabaseRpc, isSupabaseClientConfigured } from "../lib/supabase";
 import {
   normalizeIndianPhone,
   validateMissingLocationReport,
@@ -31,13 +31,49 @@ const EMPTY_AGGREGATES = {
  * Checks whether real Supabase credentials are configured in the client environment.
  */
 export function isSupabaseConfigured() {
-  const url = import.meta.env.VITE_SUPABASE_URL || "";
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+  return isSupabaseClientConfigured();
+}
+
+function formatRegistrationErrorMessage(err, messages = {}) {
+  const code = String(err?.code || "").toUpperCase();
+  const rawMsg = String(err?.message || "").trim();
+
+  if (code === "DUPLICATE_REGISTRATION") {
+    return (
+      rawMsg ||
+      "इस नाम, मोबाइल नंबर और जिले के साथ परिवार पहले से पंजीकृत है। (A registration with this name, mobile number, and district is already recorded.)"
+    );
+  }
+  if (code === "RATE_LIMITED") {
+    return (
+      rawMsg ||
+      "इस मोबाइल नंबर से हाल ही में कई पंजीकरण किए गए हैं। कृपया कुछ समय बाद पुनः प्रयास करें। (Too many registrations submitted recently from this number. Please try again later.)"
+    );
+  }
+  if (
+    code === "INVALID_NAME" ||
+    code === "INVALID_FATHER_NAME" ||
+    code === "INVALID_MEMBER_COUNT" ||
+    code === "INVALID_PHONE" ||
+    code === "INVALID_ADDRESS" ||
+    code === "MISSING_LOCATION" ||
+    code === "VILLAGE_REQUIRED_FOR_SAME_THIKANA" ||
+    code === "INVALID_HIERARCHY"
+  ) {
+    return (
+      rawMsg ||
+      messages.errSubmitFailed ||
+      "कृपया सभी आवश्यक विवरण सही से भरें और पुनः प्रयास करें। (Please verify your registration details and try again.)"
+    );
+  }
+
+  if (rawMsg && !rawMsg.includes(".catch is not a function")) {
+    return rawMsg;
+  }
+
   return (
-    Boolean(url) &&
-    Boolean(key) &&
-    !url.includes("placeholder.supabase.co") &&
-    key !== "placeholder-key"
+    messages.errSubmitFailed ||
+    "पंजीकरण सहेजते समय त्रुटि हुई। कृपया अपना विवरण जाँचकर पुनः प्रयास करें। (Could not save registration. Please verify your details and try again.)"
   );
 }
 
@@ -419,10 +455,12 @@ export function useParivaarDirectory() {
           body: JSON.stringify(payload),
         });
 
-        // If Supabase is also configured in the client environment, mirror the write to Supabase RPC best-effort
-        if (isSupabaseConfigured()) {
-          supabase
-            .rpc("submit_parivaar_registration", {
+        // If Supabase is configured in the client environment and the server did not already
+        // persist to PostgreSQL, sync to the Supabase RPC using async/await (`callSupabaseRpc`).
+        if (isSupabaseConfigured() && !data?.pg_persisted) {
+          const rpcResult = await callSupabaseRpc(
+            "submit_parivaar_registration",
+            {
               p_full_name: payload.full_name,
               p_state_code: payload.state_code,
               p_district_code: payload.district_code,
@@ -433,8 +471,31 @@ export function useParivaarDirectory() {
               p_phone_number: payload.phone_number,
               p_consent_given: payload.consent_given,
               p_thikana_same_as_village: payload.thikana_same_as_village,
-            })
-            .catch(() => {});
+              p_father_name: payload.father_name || null,
+              p_member_count: payload.member_count,
+              p_family_id: data?.family_id || null,
+            }
+          );
+
+          // If the extended 13-arg RPC signature hasn't been migrated yet, fall back to the 10-arg signature
+          if (
+            !rpcResult.ok &&
+            rpcResult.error &&
+            rpcResult.error.code !== "DUPLICATE_REGISTRATION"
+          ) {
+            await callSupabaseRpc("submit_parivaar_registration", {
+              p_full_name: payload.full_name,
+              p_state_code: payload.state_code,
+              p_district_code: payload.district_code,
+              p_subdistrict_code: payload.subdistrict_code,
+              p_village_code: payload.village_code,
+              p_thikana: payload.thikana,
+              p_current_address: payload.current_address,
+              p_phone_number: payload.phone_number,
+              p_consent_given: payload.consent_given,
+              p_thikana_same_as_village: payload.thikana_same_as_village,
+            });
+          }
         }
 
         submitLockRef.current = false;
@@ -443,10 +504,7 @@ export function useParivaarDirectory() {
         if (!data || data.ok !== true || !data.id || !data.family_id) {
           const errObj = {
             code: data?.code || "VALIDATION_FAILED",
-            message:
-              data?.message ||
-              messages.errSubmitFailed ||
-              "Registration could not be saved. Please verify your details and try again.",
+            message: formatRegistrationErrorMessage(data, messages),
           };
           setSubmitError(errObj);
           return { ok: false, error: errObj };
@@ -483,10 +541,7 @@ export function useParivaarDirectory() {
         setSubmitting(false);
         const errObj = {
           code: err?.code || "DATABASE_ERROR",
-          message:
-            err?.message ||
-            messages.errSubmitFailed ||
-            "Database error while saving registration. Your registration was not saved.",
+          message: formatRegistrationErrorMessage(err, messages),
         };
         setSubmitError(errObj);
         return { ok: false, error: errObj };
@@ -525,20 +580,18 @@ export function useParivaarDirectory() {
       });
 
       if (isSupabaseConfigured()) {
-        supabase
-          .rpc("submit_missing_location_report", {
-            p_reporter_name: payload.reporter_name,
-            p_reporter_phone: payload.reporter_phone,
-            p_state_code: payload.state_code,
-            p_district_code: payload.district_code,
-            p_subdistrict_code: payload.subdistrict_code,
-            p_missing_level: payload.missing_level,
-            p_proposed_name: payload.proposed_name,
-            p_parent_context: payload.parent_context,
-            p_pincode: payload.pincode,
-            p_notes: payload.notes,
-          })
-          .catch(() => {});
+        await callSupabaseRpc("submit_missing_location_report", {
+          p_reporter_name: payload.reporter_name,
+          p_reporter_phone: payload.reporter_phone,
+          p_state_code: payload.state_code,
+          p_district_code: payload.district_code,
+          p_subdistrict_code: payload.subdistrict_code,
+          p_missing_level: payload.missing_level,
+          p_proposed_name: payload.proposed_name,
+          p_parent_context: payload.parent_context,
+          p_pincode: payload.pincode,
+          p_notes: payload.notes,
+        });
       }
 
       return { ok: true, id: data.id };

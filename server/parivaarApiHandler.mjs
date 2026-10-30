@@ -14,6 +14,11 @@ import {
   buildAdminExportData,
   updateAdminRecord,
 } from "./parivaarDatabase.mjs";
+import {
+  ensurePostgresHydrated,
+  persistRegistrationToPostgres,
+  syncDatabaseStateToPostgres,
+} from "./parivaarPostgresSync.mjs";
 import { buildCsvBuffer, buildXlsxWorkbookBuffer } from "./xlsxBuilder.mjs";
 
 function sendJson(res, statusCode, payload) {
@@ -95,6 +100,7 @@ export async function handleParivaarApiRequest(req, res) {
       }
 
       if (action === "directory") {
+        await ensurePostgresHydrated(db);
         const level = urlObj.searchParams.get("level") || "states";
         const stateCode = urlObj.searchParams.get("state_code");
         const districtCode = urlObj.searchParams.get("district_code");
@@ -110,6 +116,7 @@ export async function handleParivaarApiRequest(req, res) {
       }
 
       if (action === "public-families") {
+        await ensurePostgresHydrated(db);
         const stateCode = urlObj.searchParams.get("state_code");
         const districtCode = urlObj.searchParams.get("district_code");
         const subdistrictCode = urlObj.searchParams.get("subdistrict_code");
@@ -125,11 +132,13 @@ export async function handleParivaarApiRequest(req, res) {
       }
 
       if (action === "summary") {
+        await ensurePostgresHydrated(db);
         const stats = querySummaryStats(db);
         return sendJson(res, 200, { ok: true, stats, summary: stats });
       }
 
       if (action === "map-aggregates") {
+        await ensurePostgresHydrated(db);
         const stateCode = urlObj.searchParams.get("state_code");
         const districtCode = urlObj.searchParams.get("district_code");
         const aggregates = queryMapAggregates({ stateCode, districtCode }, db);
@@ -138,6 +147,7 @@ export async function handleParivaarApiRequest(req, res) {
       }
 
       if (action === "admin-data") {
+        await ensurePostgresHydrated(db);
         const filters = {
           q: urlObj.searchParams.get("q") || "",
           stateCode: urlObj.searchParams.get("state_code") || "",
@@ -156,6 +166,7 @@ export async function handleParivaarApiRequest(req, res) {
       }
 
       if (action === "admin-export") {
+        await ensurePostgresHydrated(db);
         const format = (urlObj.searchParams.get("format") || "xlsx")
           .trim()
           .toLowerCase();
@@ -358,19 +369,36 @@ export async function handleParivaarApiRequest(req, res) {
       const postAction = action || String(body?.action || "").trim();
 
       if (postAction === "register") {
+        await ensurePostgresHydrated(db, { force: true });
         const result = insertParivaarRegistration(body, db);
+        if (result.ok) {
+          const pgSync = await persistRegistrationToPostgres(result, db);
+          result.pg_persisted = Boolean(pgSync.pg_persisted);
+        }
         const statusCode = result.ok ? 201 : result.code === "DUPLICATE_REGISTRATION" ? 409 : 400;
         return sendJson(res, statusCode, result);
       }
 
       if (postAction === "missing-location") {
+        await ensurePostgresHydrated(db, { force: true });
         const result = insertMissingLocationReport(body, db);
+        if (result.ok) {
+          await syncDatabaseStateToPostgres(db);
+        }
         const statusCode = result.ok ? 201 : 400;
         return sendJson(res, statusCode, result);
       }
 
       if (postAction === "admin-update") {
+        await ensurePostgresHydrated(db, { force: true });
         const result = updateAdminRecord(body, db);
+        if (result.ok) {
+          const deletedId =
+            body?.entity === "registration" && body?.operation === "delete"
+              ? body?.id
+              : null;
+          await syncDatabaseStateToPostgres(db, { deletedId });
+        }
         return sendJson(res, result.ok ? 200 : 400, result);
       }
 
