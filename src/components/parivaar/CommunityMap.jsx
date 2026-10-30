@@ -13,26 +13,81 @@ const INITIAL_ZOOM = 5;
 
 /**
  * Permitted, non-rate-limited, keyless raster basemap providers.
- * Primary: CARTO Voyager (OpenStreetMap data, keyless, CORS-friendly)
- * Automatic Fallback: Esri World Street Map (keyless, high availability)
+ * Primary: Esri World Street Map (keyless, high availability, no API key watermark)
+ * Automatic Fallbacks: Esri World Topographic Map & Humanitarian OpenStreetMap
+ * Optional Env Override: Supports `VITE_MAP_TILE_URL` or `VITE_CARTO_API_KEY` if configured.
  */
 export const TILE_PROVIDERS = {
-  CARTO_VOYAGER: {
-    id: "carto_voyager",
-    name: "CARTO Voyager",
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
-    subdomains: ["a", "b", "c", "d"],
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
   ESRI_WORLD_STREET: {
     id: "esri_world_street",
     name: "Esri World Street Map",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
     subdomains: [],
-    attribution: "Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, NGA",
+    maxZoom: 18,
+    attribution:
+      'Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener noreferrer">Esri</a> &mdash; Source: Esri, HERE, Garmin, USGS, NGA, &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+  },
+  ESRI_WORLD_TOPO: {
+    id: "esri_world_topo",
+    name: "Esri World Topographic Map",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    subdomains: [],
+    maxZoom: 18,
+    attribution:
+      'Tiles &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener noreferrer">Esri</a> &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, METI, &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+  },
+  OSM_HOT: {
+    id: "osm_hot",
+    name: "OpenStreetMap Humanitarian",
+    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+    subdomains: ["a", "b", "c"],
+    maxZoom: 18,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank" rel="noopener noreferrer">Humanitarian OpenStreetMap Team</a>',
   },
 };
+
+export function resolvePrimaryTileProvider() {
+  const customUrl = String(import.meta.env?.VITE_MAP_TILE_URL || "").trim();
+  const customAttribution = String(
+    import.meta.env?.VITE_MAP_TILE_ATTRIBUTION || ""
+  ).trim();
+  const cartoApiKey = String(import.meta.env?.VITE_CARTO_API_KEY || "").trim();
+
+  // If a valid CARTO API key is explicitly provided in environment variables
+  if (cartoApiKey && cartoApiKey !== "your_carto_api_key") {
+    const baseCartoUrl =
+      customUrl && customUrl.includes("basemaps.cartocdn.com")
+        ? customUrl.split("?")[0]
+        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
+    return {
+      id: "carto_voyager_authenticated",
+      name: "CARTO Voyager",
+      url: `${baseCartoUrl}?api_key=${encodeURIComponent(cartoApiKey)}`,
+      subdomains: ["a", "b", "c", "d"],
+      maxZoom: 18,
+      attribution:
+        customAttribution ||
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    };
+  }
+
+  // Never use unauthenticated basemaps.cartocdn.com URLs because CARTO returns
+  // HTTP 200 images with "API KEY REQUIRED — carto.com/basemaps/api" watermarks on hosted domains.
+  if (customUrl && !customUrl.includes("basemaps.cartocdn.com")) {
+    return {
+      id: "custom_env_provider",
+      name: "Custom Basemap",
+      url: customUrl,
+      subdomains: customUrl.includes("{s}") ? ["a", "b", "c"] : [],
+      maxZoom: 18,
+      attribution:
+        customAttribution || TILE_PROVIDERS.ESRI_WORLD_STREET.attribution,
+    };
+  }
+
+  return TILE_PROVIDERS.ESRI_WORLD_STREET;
+}
 
 function isValidIndiaCoordinate(lat, lng) {
   const nLat = Number(lat);
@@ -223,11 +278,12 @@ export default function CommunityMap({
       ? controlledSelectedDistrict
       : internalDistrict;
 
+  const primaryTileProvider = useMemo(() => resolvePrimaryTileProvider(), []);
   const [mapLevel, setMapLevel] = useState("auto"); // 'auto' | 'state' | 'district' | 'village'
   const [currentZoom, setCurrentZoom] = useState(INITIAL_ZOOM);
   const [tileStatus, setTileStatus] = useState("loading"); // 'loading' | 'ready' | 'fallback' | 'error'
   const [activeProvider, setActiveProvider] = useState(
-    TILE_PROVIDERS.CARTO_VOYAGER.id
+    primaryTileProvider.id
   );
   const [internalSelectedMarker, setInternalSelectedMarker] = useState(null);
 
@@ -489,7 +545,7 @@ export default function CommunityMap({
       center: INDIA_CENTER,
       zoom: INITIAL_ZOOM,
       minZoom: 4,
-      maxZoom: 15,
+      maxZoom: 18,
       maxBounds: INDIA_BOUNDS,
       maxBoundsViscosity: 0.85,
       zoomControl: false,
@@ -503,7 +559,7 @@ export default function CommunityMap({
     mapInstanceRef.current = map;
     markersLayerRef.current = L.layerGroup().addTo(map);
 
-    let fallbackTriggered = false;
+    let fallbackStage = 0;
     let errorCount = 0;
 
     const attachProvider = (providerConfig, isFallback = false) => {
@@ -513,7 +569,7 @@ export default function CommunityMap({
 
       const layerOpts = {
         attribution: providerConfig.attribution,
-        maxZoom: 18,
+        maxZoom: providerConfig.maxZoom || 18,
       };
       if (providerConfig.subdomains && providerConfig.subdomains.length > 0) {
         layerOpts.subdomains = providerConfig.subdomains;
@@ -531,11 +587,17 @@ export default function CommunityMap({
 
       layer.on("tileerror", () => {
         errorCount += 1;
-        if (!fallbackTriggered && errorCount >= 3) {
-          fallbackTriggered = true;
-          setActiveProvider(TILE_PROVIDERS.ESRI_WORLD_STREET.id);
-          attachProvider(TILE_PROVIDERS.ESRI_WORLD_STREET, true);
-        } else if (fallbackTriggered && errorCount >= 10) {
+        if (fallbackStage === 0 && errorCount >= 3) {
+          fallbackStage = 1;
+          errorCount = 0;
+          setActiveProvider(TILE_PROVIDERS.ESRI_WORLD_TOPO.id);
+          attachProvider(TILE_PROVIDERS.ESRI_WORLD_TOPO, true);
+        } else if (fallbackStage === 1 && errorCount >= 3) {
+          fallbackStage = 2;
+          errorCount = 0;
+          setActiveProvider(TILE_PROVIDERS.OSM_HOT.id);
+          attachProvider(TILE_PROVIDERS.OSM_HOT, true);
+        } else if (fallbackStage >= 2 && errorCount >= 8) {
           setTileStatus("error");
         }
       });
@@ -544,7 +606,7 @@ export default function CommunityMap({
       tileLayerRef.current = layer;
     };
 
-    attachProvider(TILE_PROVIDERS.CARTO_VOYAGER, false);
+    attachProvider(primaryTileProvider, false);
 
     map.on("zoomend", () => {
       setCurrentZoom(map.getZoom());
@@ -586,7 +648,7 @@ export default function CommunityMap({
       tileLayerRef.current = null;
       markersLayerRef.current = null;
     };
-  }, []);
+  }, [primaryTileProvider]);
 
   // Fly to selected State or District when filter changes
   useEffect(() => {
@@ -1242,11 +1304,13 @@ export default function CommunityMap({
                   "गोपनीयता सूचना (Privacy Notice): मानचित्र पर केवल पंजीकरण की कुल संख्या दिखाई जाती है; किसी भी सदस्य का नाम, मोबाइल नंबर या वर्तमान पता सार्वजनिक नहीं किया जाता।"
                 )}
               </div>
-              <div className="text-[10px] text-[#8B7355]">
+              <div className="text-[10px] text-[#8B7355]" data-testid="map-basemap-attribution">
                 Basemap:{" "}
-                {activeProvider === TILE_PROVIDERS.CARTO_VOYAGER.id
-                  ? "CARTO Voyager"
-                  : "Esri World Street Map"}{" "}
+                {activeProvider === TILE_PROVIDERS.ESRI_WORLD_TOPO.id
+                  ? TILE_PROVIDERS.ESRI_WORLD_TOPO.name
+                  : activeProvider === TILE_PROVIDERS.OSM_HOT.id
+                    ? TILE_PROVIDERS.OSM_HOT.name
+                    : primaryTileProvider.name}{" "}
                 • Official LGD GIS Coordinates
               </div>
             </div>
