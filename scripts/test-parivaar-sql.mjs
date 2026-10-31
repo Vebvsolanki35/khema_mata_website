@@ -193,33 +193,44 @@ async function main() {
     await db.exec(migrationSql);
   });
 
-  await check("3. RPC resolves with the full 17-argument call and allocates 94494-001", async () => {
+  await check("3. Family IDs already published by the site are reserved", async () => {
+    const counter = await db.query(
+      "select last_seq from public.village_family_id_counters where village_code = '94494'"
+    );
+    assert.equal(
+      counter.rows[0]?.last_seq,
+      1,
+      "the counter must reserve 94494-001 for the verified Chhapawda family"
+    );
+  });
+
+  await check("4. RPC resolves with the full 17-argument call and allocates the next Family ID", async () => {
     const call = buildCall(ARGS_V2, ARGS_V2.map((key) => registrationValues()[key]));
     const { rows } = await db.query(call.sql, call.values);
     const result = rows[0].result;
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.family_id, "94494-001");
+    assert.equal(result.family_id, "94494-002");
     assert.equal(result.father_name, "Test Father");
     assert.equal(result.member_count, 4);
     const saved = await db.query(
       "select family_id, full_name, father_name, member_count, status from parivaar_registrations where family_id = $1",
-      ["94494-001"]
+      ["94494-002"]
     );
     assert.equal(saved.rows.length, 1);
     assert.equal(saved.rows[0].status, "approved");
   });
 
-  await check("4. RPC still resolves with the 10-argument call from the production error", async () => {
+  await check("5. RPC still resolves with the 10-argument call from the production error", async () => {
     const values = ARGS_V1.map((key) => registrationValues()[key]);
     values[0] = "TEST_VERIFICATION_Legacy_Shape";
     values[3] = "9812345671"; // p_phone_number
     const call = buildCall(ARGS_V1, values);
     const { rows } = await db.query(call.sql, call.values);
     assert.equal(rows[0].result.ok, true, JSON.stringify(rows[0].result));
-    assert.equal(rows[0].result.family_id, "94494-002");
+    assert.equal(rows[0].result.family_id, "94494-003");
   });
 
-  await check("5. Duplicate submission is rejected and allocates no new Family ID", async () => {
+  await check("6. Duplicate submission is rejected and allocates no new Family ID", async () => {
     const v = registrationValues();
     const call = buildCall(ARGS_V2, ARGS_V2.map((key) => v[key]));
     const { rows } = await db.query(call.sql, call.values);
@@ -229,7 +240,7 @@ async function main() {
     assert.equal(count.rows[0].c, 2);
   });
 
-  await check("6. Family IDs stay sequential, unique and zero-padded", async () => {
+  await check("7. Family IDs stay sequential, unique and zero-padded", async () => {
     for (let i = 0; i < 9; i += 1) {
       const v = registrationValues({
         p_full_name: `TEST_VERIFICATION_Sequence_${i}`,
@@ -238,7 +249,7 @@ async function main() {
       const call = buildCall(ARGS_V2, ARGS_V2.map((key) => v[key]));
       const { rows } = await db.query(call.sql, call.values);
       assert.equal(rows[0].result.ok, true, JSON.stringify(rows[0].result));
-      assert.equal(rows[0].result.family_id, `94494-${String(3 + i).padStart(3, "0")}`);
+      assert.equal(rows[0].result.family_id, `94494-${String(4 + i).padStart(3, "0")}`);
     }
     const dupes = await db.query(
       "select family_id, count(*) c from parivaar_registrations group by family_id having count(*) > 1"
@@ -246,7 +257,7 @@ async function main() {
     assert.equal(dupes.rows.length, 0, "no duplicate Family IDs");
   });
 
-  await check("7. Public read RPCs work and never expose private fields", async () => {
+  await check("8. Public read RPCs work and never expose private fields", async () => {
     const families = await db.query(
       "select public.get_public_parivaar_families(null, null, null, null, null, 1, 50) as result"
     );
@@ -278,7 +289,7 @@ async function main() {
     assert.equal(aggregates.villages[0].registration_count, payload.total);
   });
 
-  await check("8. Re-applying the migration to a populated database preserves every record and counter", async () => {
+  await check("9. Re-applying the migration to a populated database preserves every record and counter", async () => {
     const before = await db.query(
       "select count(*)::int as families, coalesce(sum(member_count),0)::int as members from parivaar_registrations"
     );
@@ -308,19 +319,62 @@ async function main() {
     );
     assert.equal(
       next.rows[0].result.family_id,
-      `94494-${String(3 + 9).padStart(3, "0")}`,
+      `94494-${String(4 + 9).padStart(3, "0")}`,
       "sequence must continue where it left off"
     );
   });
 
-  await check("9. Personal data is protected by RLS on the registrations table", async () => {
+  await check("10. The content store exists and only exposes public settings to visitors", async () => {
+    const table = await db.query(
+      `select 1 from information_schema.tables
+        where table_schema = 'public' and table_name = 'site_content'`
+    );
+    assert.equal(table.rows.length, 1, "site_content must exist for the Parivaar store");
+
+    // A public setting and a private (encrypted) Parivaar record row.
+    await db.exec(`
+      insert into public.site_content (key, value) values ('upi_id_1', 'trust@upi')
+        on conflict (key) do nothing;
+      insert into public.site_content (key, value) values ('parivaar_reg_v1:test', '{"enc":"x"}')
+        on conflict (key) do nothing;
+    `);
+
+    await db.exec("set role anon");
+    let visible;
+    try {
+      visible = await db.query("select key from public.site_content order by key");
+    } finally {
+      await db.exec("reset role");
+    }
+    const keys = visible.rows.map((row) => row.key);
+    assert.deepEqual(keys, ["upi_id_1"], "anon must only see public settings");
+    assert.ok(!keys.includes("parivaar_reg_v1:test"), "encrypted Parivaar rows must stay private");
+
+    // The service role (used by the store) bypasses RLS: insert/update/delete work.
+    await db.exec(`
+      insert into public.site_content (key, value) values ('parivaar_rev_v1', '{"rev":"t1"}')
+        on conflict (key) do update set value = excluded.value;
+      update public.site_content set value = '{"rev":"t2"}' where key = 'parivaar_rev_v1';
+    `);
+    const revision = await db.query(
+      "select value from public.site_content where key = 'parivaar_rev_v1'"
+    );
+    assert.equal(revision.rows[0].value, '{"rev":"t2"}');
+
+    const touched = await db.query(
+      "select updated_at > created_check as changed from (select updated_at, now() - interval '1 second' as created_check from public.site_content where key = 'parivaar_rev_v1') t"
+    );
+    assert.equal(touched.rows[0].changed, true, "updated_at must be maintained");
+  });
+
+  await check("11. Personal data is protected by RLS on the registrations table", async () => {
     const rls = await db.query(
       `select relrowsecurity from pg_class where oid = 'public.parivaar_registrations'::regclass`
     );
     assert.equal(rls.rows[0].relrowsecurity, true);
   });
 
-  await check("10. anon/authenticated receive EXECUTE on the registration RPC", async () => {
+  await check("12. anon/authenticated receive EXECUTE on the registration RPC", async () => {
     for (const role of ["anon", "authenticated"]) {
       const grant = await db.query(
         `select has_function_privilege($1,
@@ -355,7 +409,7 @@ async function main() {
     ) returns jsonb language sql as $$ select jsonb_build_object('ok', true) $$;
   `);
 
-  await check("11. A stale differently-shaped function is replaced, not duplicated", async () => {
+  await check("13. A stale differently-shaped function is replaced, not duplicated", async () => {
     await staleDb.exec(migrationSql);
     const procs = await staleDb.query(
       `select count(*)::int as c, min(pg_get_function_identity_arguments(p.oid)) as args
@@ -370,7 +424,7 @@ async function main() {
     const call = buildCall(ARGS_V2, ARGS_V2.map((key) => v[key]));
     const { rows } = await staleDb.query(call.sql, call.values);
     assert.equal(rows[0].result.ok, true, JSON.stringify(rows[0].result));
-    assert.equal(rows[0].result.family_id, "94494-001");
+    assert.equal(rows[0].result.family_id, "94494-002");
 
     // ...and the repair stays idempotent from that state too.
     await staleDb.exec(migrationSql);

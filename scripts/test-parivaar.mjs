@@ -1328,6 +1328,33 @@ check("10. [Performance & Real-Time Sync] Server-side validation dry-run, idempo
     "The same family must never be counted twice"
   );
 
+  // 10c-2. A Family ID issued by the database must never overwrite a different
+  //        family that is already published (e.g. a freshly provisioned database
+  //        whose counter is behind the verified baseline record).
+  const baselineBefore = db
+    .prepare(
+      "SELECT full_name, phone_number FROM parivaar_registrations WHERE family_id = '94494-001'"
+    )
+    .get();
+  const collision = applyPostgresRegistrationToReplica(
+    db,
+    {
+      ...pgRecord,
+      id: "22222222-3333-4444-5555-666666666666",
+      family_id: "94494-001",
+      full_name: "TEST_VERIFICATION_Collision_Family",
+    },
+    { currentAddress: "Test address", phone: "9812345672" }
+  );
+  assert.equal(collision.ok, false, "A conflicting Family ID must not be applied");
+  assert.equal(collision.code, "FAMILY_ID_CONFLICT");
+  const baselineAfter = db
+    .prepare(
+      "SELECT full_name, phone_number FROM parivaar_registrations WHERE family_id = '94494-001'"
+    )
+    .get();
+  assert.deepEqual(baselineAfter, baselineBefore, "The existing family must never be overwritten");
+
   // 10d. HTTP contract: revision endpoint, cache headers, and no stale-success behaviour
   const server = http.createServer((req, res) => {
     handleParivaarApiRequest(req, res).catch(() => {
