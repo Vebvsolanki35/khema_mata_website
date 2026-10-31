@@ -26,6 +26,7 @@ function LocationDirectory({
   onPrefillRegistration,
   externalFilter,
   refreshTick = 0,
+  mobileUi,
   t,
 }) {
   const [directoryTab, setDirectoryTab] = useState("families"); // "families" | "locations"
@@ -506,6 +507,13 @@ function LocationDirectory({
     setDirectoryTab("families");
   };
 
+  const activeLocationFilterCount = [
+    selectedState,
+    selectedDistrict,
+    selectedSubdistrict,
+    selectedVillage,
+  ].filter(Boolean).length;
+
   return (
     <section
       id="parivaar-directory"
@@ -765,7 +773,7 @@ function LocationDirectory({
               >
                 🔍{" "}
                 {directoryTab === "families"
-                  ? "Family ID, मुखिया का नाम या गाँव खोजें (Search by Family ID, Head Name or Location)"
+                  ? (mobileUi || t.mobileUi)?.directorySearchTitle || "परिवार खोजें (Find a family)"
                   : t.directorySearchLabel}
               </label>
               <input
@@ -776,8 +784,11 @@ function LocationDirectory({
                 value={searchQuery}
                 onChange={handleSearchChange}
                 placeholder={
-                  t.familySearchPlaceholder || t.directorySearchPlaceholder
+                  directoryTab === "families"
+                    ? (mobileUi || t.mobileUi)?.directorySearchHint || t.familySearchPlaceholder
+                    : t.directorySearchPlaceholder
                 }
+                aria-label={(mobileUi || t.mobileUi)?.directorySearchTitle || "परिवार खोजें"}
                 className="w-full rounded-xl px-3.5 py-2.5 text-base focus:outline-none"
                 style={{
                   backgroundColor: "#FFFFFF",
@@ -795,7 +806,7 @@ function LocationDirectory({
               aria-expanded={showFiltersMobile}
               aria-controls="directory-hierarchy-filters"
               data-testid="directory-mobile-filter-toggle"
-              className="md:hidden px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               style={{
                 minHeight: "48px",
                 backgroundColor:
@@ -819,8 +830,27 @@ function LocationDirectory({
             >
               <span aria-hidden="true">⚙️</span>
               <span>
-                राज्य / जिला / तहसील / गाँव चुनें (Filter by Location)
+                {(mobileUi || t.mobileUi)?.directoryFiltersSummary ||
+                  "उन्नत फ़िल्टर — राज्य / जिला / तहसील / गाँव (Advanced filters)"}
               </span>
+              {activeLocationFilterCount > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full font-bold"
+                  style={{
+                    minWidth: "20px",
+                    height: "20px",
+                    padding: "0 5px",
+                    fontSize: "0.7rem",
+                    backgroundColor: showFiltersMobile
+                      ? "var(--gold)"
+                      : "var(--maroon)",
+                    color: showFiltersMobile ? "var(--maroon)" : "var(--gold)",
+                  }}
+                  data-testid="directory-active-filter-count"
+                >
+                  {activeLocationFilterCount}
+                </span>
+              )}
               <span aria-hidden="true" className="text-xs">
                 {showFiltersMobile ? "▲" : "▼"}
               </span>
@@ -831,13 +861,7 @@ function LocationDirectory({
           <div
             id="directory-hierarchy-filters"
             className={`${
-              showFiltersMobile ||
-              selectedState ||
-              selectedDistrict ||
-              selectedSubdistrict ||
-              selectedVillage
-                ? "grid"
-                : "hidden md:grid"
+              showFiltersMobile ? "grid" : "hidden"
             } grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t`}
             style={{ borderColor: "rgba(212,175,55,0.3)" }}
           >

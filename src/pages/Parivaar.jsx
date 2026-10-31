@@ -1,4 +1,5 @@
-import { Component, Suspense, lazy, useCallback, useState } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import {
   useParivaarDirectory,
@@ -8,6 +9,19 @@ import LocationDirectory from "../components/parivaar/LocationDirectory";
 import ParivaarRegistrationForm from "../components/parivaar/ParivaarRegistrationForm";
 
 const CommunityMap = lazy(() => import("../components/parivaar/CommunityMap"));
+
+/**
+ * Friendly deep-link hashes (used by the Home action cards, the More sheet and
+ * the footer) mapped onto the section wrappers that already exist on this page.
+ * `ScrollToTop` in App.jsx also tries the raw hash, so both work.
+ */
+const HASH_TO_SECTION = {
+  register: "parivaar-register",
+  directory: "parivaar-directory",
+  map: "parivaar-map",
+  help: "parivaar-help",
+  overview: "parivaar-overview",
+};
 
 function MapLoadingSkeleton() {
   return (
@@ -150,6 +164,39 @@ function Parivaar() {
       block: "start",
     });
   };
+
+  // Deep links: /parivaar#register, #directory, #map, #help, #overview
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return undefined;
+    const key = decodeURIComponent(hash.replace(/^#/, ""));
+    const sectionId = HASH_TO_SECTION[key] || key;
+    const timer = window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: "auto",
+        block: "start",
+      });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [hash]);
+
+  // Three landing actions — Register / Find / Map (existing sections, no new pages)
+  const parivaarActions = (
+    t.mobileUi?.parivaarActions || [
+      { icon: "📝", title: p.registerCtaLocal || "परिवार पंजीकरण", desc: "", action: "register" },
+      { icon: "🔍", title: p.familiesTabLabel || "परिवार खोजें", desc: "", action: "directory" },
+      { icon: "🗺️", title: p.exploreMapCtaLocal || "समाज का मानचित्र", desc: "", action: "map" },
+    ]
+  ).map((item) => ({
+    ...item,
+    sectionId: HASH_TO_SECTION[item.action] || "parivaar-overview",
+    testId:
+      item.action === "register"
+        ? "hero-register-btn"
+        : item.action === "directory"
+          ? "hero-directory-btn"
+          : "hero-map-btn",
+  }));
 
   const handlePrefillRegistration = (loc) => {
     setPrefillLocation({ ...loc, _ts: Date.now() });
@@ -315,47 +362,72 @@ function Parivaar() {
               : p.heroDescription}
           </p>
 
-          {/* Two prominent mobile-first actions */}
-          <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3.5 max-w-md sm:max-w-none mx-auto">
-            <button
-              type="button"
-              onClick={() => scrollToSection("parivaar-register")}
-              data-testid="hero-register-btn"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl sm:rounded-full font-bold text-sm sm:text-base shadow-lg transition-transform active:scale-98 sm:hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: "var(--gold)",
-                color: "var(--maroon)",
-                border: "2px solid var(--gold)",
-                minHeight: "48px",
-              }}
-            >
-              <span aria-hidden="true">📝</span>
-              <span>
-                {activeLang === "hi"
-                  ? "परिवार पंजीकरण (Register Family)"
-                  : p.registerCtaBtn || "परिवार पंजीकरण (Register Family)"}
-              </span>
-            </button>
+        </div>
+      </section>
 
-            <button
-              type="button"
-              onClick={() => scrollToSection("parivaar-map")}
-              data-testid="hero-map-btn"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl sm:rounded-full font-bold text-sm sm:text-base transition-transform active:scale-98 sm:hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: "rgba(255,248,240,0.08)",
-                color: "#FFF8F0",
-                border: "2px solid var(--gold)",
-                minHeight: "48px",
-              }}
-            >
-              <span aria-hidden="true">🗺️</span>
-              <span>
-                {activeLang === "hi"
-                  ? "समाज का मानचित्र (Community Map)"
-                  : p.exploreMapCtaBtn || "समाज का मानचित्र (Community Map)"}
-              </span>
-            </button>
+      {/* Landing actions: Register Family · Find Family · Community Map.
+          Each one scrolls to the section that already exists below. */}
+      <section
+        aria-labelledby="parivaar-actions-title"
+        className="px-3.5 sm:px-4 py-4 sm:py-6"
+        style={{ backgroundColor: "var(--cream)" }}
+      >
+        <div className="max-w-3xl mx-auto">
+          <h2
+            id="parivaar-actions-title"
+            className="text-sm sm:text-base font-bold text-center mb-2.5"
+            style={{ color: "var(--maroon)" }}
+          >
+            {t.mobileUi?.parivaarActionsTitle || "आप क्या करना चाहते हैं?"}
+          </h2>
+          <div
+            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3"
+            data-testid="parivaar-landing-actions"
+          >
+            {parivaarActions.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                onClick={() => scrollToSection(item.sectionId)}
+                data-testid={item.testId}
+                className="flex items-center sm:flex-col sm:items-start gap-3 rounded-2xl bg-white p-3.5 text-left shadow-sm transition-transform active:scale-[0.98] cursor-pointer"
+                style={{
+                  border: "1.5px solid rgba(212,175,55,0.7)",
+                  minHeight: "76px",
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
+                  style={{ backgroundColor: "rgba(212,175,55,0.2)" }}
+                >
+                  {item.icon}
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className="block font-bold text-sm leading-tight"
+                    style={{ color: "var(--maroon)" }}
+                  >
+                    {item.title}
+                  </span>
+                  {item.desc && (
+                    <span
+                      className="block text-[11px] leading-snug mt-0.5"
+                      style={{ color: "#6B5B4B" }}
+                    >
+                      {item.desc}
+                    </span>
+                  )}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="ml-auto sm:hidden text-base"
+                  style={{ color: "var(--gold)" }}
+                >
+                  ›
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </section>
@@ -364,7 +436,7 @@ function Parivaar() {
       <nav
         aria-label="Parivaar Directory Sections"
         data-testid="parivaar-section-nav"
-        className="py-2.5 px-3.5 border-b sticky top-[56px] z-30 backdrop-blur-md"
+        className="py-2 px-3.5 border-b sticky top-[60px] z-30 backdrop-blur-md"
         style={{
           backgroundColor: "rgba(255,248,240,0.95)",
           borderColor: "rgba(212,175,55,0.5)",
@@ -670,6 +742,7 @@ function Parivaar() {
         onPrefillRegistration={handlePrefillRegistration}
         externalFilter={directoryExternalFilter}
         refreshTick={directoryRefreshTick}
+        mobileUi={t.mobileUi}
       />
 
       {/* ====================================================================
@@ -692,6 +765,7 @@ function Parivaar() {
         prefillLocation={prefillLocation}
         onViewInDirectory={handleViewInDirectory}
         adminContactPhone={adminContactPhone}
+        mobileUi={t.mobileUi}
       />
 
       {/* ====================================================================

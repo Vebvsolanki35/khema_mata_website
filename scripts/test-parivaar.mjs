@@ -24,7 +24,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { inflateRawSync } from "node:zlib";
-import { SECTIONS, getActiveSection } from "../src/data/navigation.js";
+import {
+  SECTIONS,
+  BOTTOM_TABS,
+  MORE_MENU_GROUPS,
+  ALL_PUBLIC_ROUTES,
+  getActiveSection,
+} from "../src/data/navigation.js";
 import translations from "../src/data/translations.js";
 import { BANK_DETAILS, UPI_IDS } from "../src/config/donation.js";
 import { WHATSAPP_GROUP_INVITE } from "../src/config/constants.js";
@@ -764,6 +770,71 @@ check("6. Map tile configuration, LGD Data-Quality Report, Navigation preservati
 
   const ids = SECTIONS.map((s) => s.id);
   assert.deepEqual(ids, ["home", "heritage", "darshan", "visit", "seva", "parivaar"]);
+  // 6a. Mobile-first navigation: exactly five fixed bottom tabs, and every
+  // "More" sheet destination must be a page that already exists.
+  assert.deepEqual(
+    BOTTOM_TABS.map((t) => t.id),
+    ["home", "parivaar", "temple", "seva", "more"],
+    "Fixed bottom navigation must have exactly: Home, Parivaar, Temple, Seva, More"
+  );
+  const moreRoutes = MORE_MENU_GROUPS.flatMap((group) =>
+    group.items.map((item) => item.to)
+  );
+  assert.ok(moreRoutes.length > 0, "More sheet must link to secondary pages");
+  for (const route of moreRoutes) {
+    assert.ok(
+      ALL_PUBLIC_ROUTES.includes(route) || route === "/admin/login",
+      `More sheet route ${route} must be an existing page (no new pages allowed)`
+    );
+  }
+
+  // 6b. Exactly one mobile navigation system: the header drawer is gone and
+  // every secondary destination is reachable from the bottom nav / More sheet.
+  const navbarSrc = fs.readFileSync(
+    path.join(ROOT, "src/components/layout/Navbar.jsx"),
+    "utf8"
+  );
+  assert.equal(
+    navbarSrc.includes("mobile-nav-drawer"),
+    false,
+    "The mobile hamburger drawer must be replaced by the fixed bottom navigation"
+  );
+  const bottomNavSrc = fs.readFileSync(
+    path.join(ROOT, "src/components/layout/BottomNav.jsx"),
+    "utf8"
+  );
+  assert.ok(
+    bottomNavSrc.includes('data-testid="bottom-nav"') &&
+      bottomNavSrc.includes("BOTTOM_TABS"),
+    "A fixed bottom navigation derived from BOTTOM_TABS must exist"
+  );
+
+  // 6c. Registration is a 4-step wizard reusing the shared validator and the
+  // same submit call — no second form and no duplicate validation rules.
+  const wizardSrc = fs.readFileSync(
+    path.join(ROOT, "src/components/parivaar/ParivaarRegistrationForm.jsx"),
+    "utf8"
+  );
+  assert.ok(wizardSrc.includes("TOTAL_STEPS = 4"), "Registration must have 4 steps");
+  assert.ok(
+    wizardSrc.includes('data-testid="reg-step-indicator"') &&
+      wizardSrc.includes('data-testid="reg-next-btn"') &&
+      wizardSrc.includes('data-testid="reg-back-btn"') &&
+      wizardSrc.includes('data-testid="reg-submit-btn"'),
+    "Wizard must expose progress indicator plus next/back/submit controls"
+  );
+  assert.ok(
+    wizardSrc.includes("validateParivaarRegistration(") &&
+      wizardSrc.includes("submitRegistration("),
+    "Wizard must reuse the shared validator and the single submitRegistration call"
+  );
+  assert.ok(
+    wizardSrc.includes("id=\"parivaar-state\"") &&
+      wizardSrc.includes("id=\"parivaar-district\"") &&
+      wizardSrc.includes("id=\"parivaar-subdistrict\"") &&
+      wizardSrc.includes("id=\"parivaar-village\""),
+    "Ancestral village step must keep the sequential State → District → Tehsil → Village selects"
+  );
   assert.equal(getActiveSection("/parivaar")?.section?.id, "parivaar");
   assert.equal(BANK_DETAILS.accountNumber, "686005601933");
   assert.equal(BANK_DETAILS.ifsc, "ICIC0006860");

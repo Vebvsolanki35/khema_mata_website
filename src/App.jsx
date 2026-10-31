@@ -1,9 +1,10 @@
-import { Component, Suspense, lazy, useEffect } from "react";
+import { Component, Suspense, lazy, useEffect, useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
 import Ticker from "./components/layout/Ticker";
 import Footer from "./components/layout/Footer";
 import FloatingButtons from "./components/layout/FloatingButtons";
+import BottomNav from "./components/layout/BottomNav";
 import { LanguageProvider } from "./context/LanguageContext";
 import Home from "./pages/Home";
 import Parivaar from "./pages/Parivaar";
@@ -22,14 +23,31 @@ const Planner = lazy(() => import("./pages/Planner"));
 const Calendar = lazy(() => import("./pages/Calendar"));
 const Trust = lazy(() => import("./pages/Trust"));
 
+/**
+ * Scrolls to the top on route change, but honours a `#hash` so deep links such
+ * as `/parivaar#register` (Home action cards, More sheet, footer) land on the
+ * right section instead of the top of a very long page.
+ */
 function ScrollToTop() {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
-    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
-  }, [pathname]);
+    const behavior = prefersReducedMotion ? "auto" : "smooth";
+
+    if (hash) {
+      const id = decodeURIComponent(hash.replace(/^#/, ""));
+      // Wait one frame so lazily-loaded pages have rendered their sections.
+      const timer = window.setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior, block: "start" });
+      }, 80);
+      return () => window.clearTimeout(timer);
+    }
+
+    window.scrollTo({ top: 0, behavior });
+    return undefined;
+  }, [pathname, hash]);
   return null;
 }
 
@@ -117,6 +135,7 @@ function App() {
   // The admin console keeps its own chrome — no public nav, ticker, footer or
   // floating donation/WhatsApp buttons there.
   const isAdmin = pathname.startsWith("/admin");
+  const [moreOpen, setMoreOpen] = useState(false);
 
   return (
     <LanguageProvider>
@@ -155,6 +174,9 @@ function App() {
       </PageErrorBoundary>
 
       {!isAdmin && <Footer />}
+      {!isAdmin && (
+        <BottomNav open={moreOpen} onOpenChange={setMoreOpen} />
+      )}
     </LanguageProvider>
   );
 }
