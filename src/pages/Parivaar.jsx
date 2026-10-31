@@ -412,7 +412,7 @@ function Parivaar() {
                   </span>
                   {item.desc && (
                     <span
-                      className="block text-[11px] leading-snug mt-0.5"
+                      className="block text-xs leading-snug mt-0.5"
                       style={{ color: "#6B5B4B" }}
                     >
                       {item.desc}
@@ -436,7 +436,7 @@ function Parivaar() {
       <nav
         aria-label="Parivaar Directory Sections"
         data-testid="parivaar-section-nav"
-        className="py-2 px-3.5 border-b sticky top-[60px] z-30 backdrop-blur-md"
+        className="py-2 px-3.5 border-b static md:sticky md:top-[60px] z-30 backdrop-blur-md"
         style={{
           backgroundColor: "rgba(255,248,240,0.95)",
           borderColor: "rgba(212,175,55,0.5)",

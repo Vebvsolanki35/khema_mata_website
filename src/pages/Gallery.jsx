@@ -26,10 +26,10 @@ function GalleryHero() {
 
   return (
     <section
-      className="py-16 px-4 text-center"
+      className="py-10 sm:py-14 px-4 text-center"
       style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
     >
-      <div className="text-5xl mb-4">📷</div>
+      <div className="text-3xl sm:text-4xl mb-2.5">📷</div>
       <h1
         className="text-3xl md:text-4xl font-bold mb-2"
         style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
@@ -51,8 +51,6 @@ export function GalleryContent() {
   const { t } = useLanguage();
   const [selected, setSelected] = useState(null);
   const [dbImages, setDbImages] = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
 
   useEffect(() => {
     supabase
@@ -63,30 +61,6 @@ export function GalleryContent() {
         if (data && data.length > 0) setDbImages(data);
       });
   }, []);
-
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const fileName = `${Date.now()}_${file.name}`;
-      const { error: uploadErr } = await supabase.storage
-        .from("gallery")
-        .upload(fileName, file);
-      if (uploadErr) throw uploadErr;
-      const { data: urlData } = supabase.storage.from("gallery").getPublicUrl(fileName);
-      const publicUrl = urlData.publicUrl;
-      const { error: insertErr } = await supabase
-        .from("gallery_images")
-        .insert({ url: publicUrl, title: fileName });
-      if (insertErr) throw insertErr;
-      setDbImages((prev) => [{ url: publicUrl, title: fileName }, ...prev]);
-    } catch (err) {
-      setUploadError(err.message || "Upload failed");
-    }
-    setUploading(false);
-  };
 
   /**
    * The authentic temple photograph supplied by the trust.
@@ -109,26 +83,6 @@ export function GalleryContent() {
       {/* Gallery Grid */}
       <section className="py-12 px-4" style={{ backgroundColor: "var(--cream)" }}>
         <div className="max-w-6xl mx-auto">
-          {/* Upload */}
-          <div className="text-center mb-8">
-            <label
-              className="px-6 py-2 rounded-full font-semibold text-sm transition-colors cursor-pointer inline-block"
-              style={{ backgroundColor: "var(--maroon)", color: "var(--gold)", border: "1px solid var(--gold)" }}
-            >
-              {uploading ? "⏳ अपलोड हो रहा है…" : `📤 ${t.gallery.upload}`}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleUpload}
-                disabled={uploading}
-              />
-            </label>
-            {uploadError && (
-              <p className="text-red-500 text-sm mt-2">{uploadError}</p>
-            )}
-          </div>
-
           {/* Masonry Grid */}
           <div className="masonry-grid">
             {allImages.map((img, idx) => (
