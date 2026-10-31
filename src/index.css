@@ -11,6 +11,9 @@
   /* WhatsApp: AA-contrast variant of the brand green (#25D366 is only 1.98:1
      against white). Keep in sync with WHATSAPP_GREEN in src/config/constants.js */
   --whatsapp: #188748;
+
+  /* Height of the fixed mobile bottom navigation (excluding the iOS safe area) */
+  --bottom-nav-h: 62px;
 }
 
 html,
@@ -26,8 +29,9 @@ body {
   background-color: var(--cream);
   color: #2D1B0E;
   line-height: 1.6;
-  /* Reserve bottom space on mobile so compact floating action buttons never cover footer or form controls */
-  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  /* Reserve bottom space on mobile so the fixed bottom navigation never covers
+     the footer, the last form control or the submit button. */
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 10px);
 }
 
 @media (min-width: 768px) {
@@ -351,4 +355,170 @@ textarea:focus-visible {
 .leaflet-popup-content {
   margin: 10px 12px !important;
   line-height: 1.45 !important;
+}
+
+
+/* =========================================================================
+   Fixed mobile bottom navigation (Home · Parivaar · Temple · Seva · More)
+   ========================================================================= */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 95;
+  background-color: rgba(107, 19, 19, 0.98);
+  border-top: 2px solid var(--gold);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.22);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: var(--bottom-nav-h);
+  min-width: 44px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.97);
+}
+
+/* =========================================================================
+   "More" bottom sheet (secondary destinations + language + WhatsApp)
+   ========================================================================= */
+.more-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.more-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(24, 12, 6, 0.58);
+  cursor: pointer;
+}
+
+.more-sheet-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  padding-top: 6px;
+  background: var(--cream);
+  border-top: 3px solid var(--gold);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.32);
+  animation: sheet-up 0.22s ease-out;
+}
+
+.more-sheet-handle {
+  width: 44px;
+  height: 4px;
+  flex: 0 0 auto;
+  margin: 4px auto 8px;
+  border-radius: 9999px;
+  background: rgba(139, 26, 26, 0.28);
+}
+
+.more-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+.more-sheet-primary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--maroon);
+  color: var(--gold);
+  border: 1.5px solid var(--gold);
+  text-decoration: none;
+}
+
+.more-sheet-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  color: var(--maroon);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.more-sheet-link:active,
+.more-sheet-primary:active {
+  transform: scale(0.98);
+}
+
+.more-sheet-lang {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.more-sheet-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  border-radius: 12px;
+  font-weight: 700;
+  background: var(--gold);
+  color: var(--maroon);
+  text-decoration: none;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .more-sheet-panel {
+    animation: none;
+  }
+}
+
+/* Deep links such as /parivaar#register must not hide behind the sticky header */
+[id^="parivaar-"] {
+  scroll-margin-top: 76px;
 }

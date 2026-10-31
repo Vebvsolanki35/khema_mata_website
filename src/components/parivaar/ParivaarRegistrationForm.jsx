@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import SearchableSelect from "./SearchableSelect";
+import { validateParivaarRegistration } from "../../lib/validateParivaar";
 
 const INITIAL_FORM = {
   fullName: "",
@@ -49,11 +50,36 @@ function ParivaarRegistrationForm({
   prefillLocation,
   onViewInDirectory,
   adminContactPhone = "",
+  mobileUi,
   t,
 }) {
   const [values, setValues] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
   const [copiedId, setCopiedId] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // 4-step registration wizard
+  //   Step 1 Family Details · Step 2 Members · Step 3 Ancestral Village
+  //   Step 4 Current Address & Review
+  // All steps write into the SAME `values` object, so moving back and forth (or
+  // jumping via the step chips) never loses anything, and the single
+  // `submitRegistration` call at the end is unchanged.
+  // ---------------------------------------------------------------------------
+  const [currentStep, setCurrentStep] = useState(0);
+  const TOTAL_STEPS = 4;
+  const regSteps = (mobileUi || t.mobileUi)?.regSteps || {};
+  const STEPS = [
+    { id: "family", label: regSteps.family || "परिवार विवरण (Family Details)" },
+    { id: "members", label: regSteps.members || "सदस्य (Members)" },
+    { id: "village", label: regSteps.village || "पैतृक गाँव (Ancestral Village)" },
+    { id: "address", label: regSteps.address || "पता एवं समीक्षा (Address & Review)" },
+  ];
+  const STEP_FIELDS = [
+    ["fullName", "fatherName", "phoneNumber"],
+    ["memberCount"],
+    ["stateCode", "districtCode", "subdistrictCode", "villageCode"],
+    ["currentAddress"],
+  ];
 
   const [districts, setDistricts] = useState([]);
   const [subdistricts, setSubdistricts] = useState([]);
@@ -269,9 +295,92 @@ function ParivaarRegistrationForm({
     }));
   };
 
+  /**
+   * Field-id lookup so an invalid control can be focused and scrolled into view.
+   */
+  const FIELD_DOM_IDS = {
+    fullName: "parivaar-full-name",
+    fatherName: "parivaar-father-name",
+    phoneNumber: "parivaar-phone",
+    memberCount: "parivaar-member-count",
+    stateCode: "parivaar-state",
+    districtCode: "parivaar-district",
+    subdistrictCode: "parivaar-subdistrict",
+    villageCode: "parivaar-village",
+    currentAddress: "parivaar-current-address",
+  };
+
+  const focusFirstError = (fieldErrors = {}) => {
+    const firstField = Object.keys(fieldErrors)[0];
+    if (!firstField) return;
+    const el = document.getElementById(FIELD_DOM_IDS[firstField]);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus?.({ preventScroll: true });
+  };
+
+  /**
+   * Reuses the shared validator (`src/lib/validateParivaar.js`) — the single
+   * source of truth also used by the server/API tests — and slices its result
+   * per wizard step. No duplicated validation rules.
+   */
+  const buildAllErrors = () =>
+    validateParivaarRegistration(
+      {
+        ...values,
+        requireVillage: true,
+        thikana: selectedVillageName,
+        thikanaSameAsVillage: true,
+        consentGiven: true,
+        selectedVillageName,
+      },
+      t
+    );
+
+  const validateStep = (step) => {
+    const all = buildAllErrors();
+    const stepErrors = {};
+    for (const field of STEP_FIELDS[step] || []) {
+      if (all[field]) stepErrors[field] = all[field];
+    }
+    if (Object.keys(stepErrors).length) {
+      setErrors((prev) => ({ ...prev, ...stepErrors }));
+    }
+    return stepErrors;
+  };
+
+  const goNext = () => {
+    const stepErrors = validateStep(currentStep);
+    if (Object.keys(stepErrors).length) {
+      focusFirstError(stepErrors);
+      return;
+    }
+    setCurrentStep((step) => Math.min(step + 1, TOTAL_STEPS - 1));
+  };
+
+  const goBack = () => setCurrentStep((step) => Math.max(step - 1, 0));
+
+  const goToStep = (step) => {
+    if (step < 0 || step > currentStep) return;
+    setCurrentStep(step);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
+
+    // Final check across every step: an invalid earlier step is revealed
+    // instead of a silently failed submission.
+    const allErrors = buildAllErrors();
+    if (Object.keys(allErrors).length) {
+      setErrors(allErrors);
+      const firstStep = STEP_FIELDS.findIndex((fields) =>
+        fields.some((field) => allErrors[field])
+      );
+      if (firstStep >= 0) setCurrentStep(firstStep);
+      focusFirstError(allErrors);
+      return;
+    }
 
     const result = await submitRegistration(
       {
@@ -286,6 +395,10 @@ function ParivaarRegistrationForm({
     );
     if (!result.ok && result.fieldErrors) {
       setErrors(result.fieldErrors);
+      const firstStep = STEP_FIELDS.findIndex((fields) =>
+        fields.some((field) => result.fieldErrors[field])
+      );
+      if (firstStep >= 0) setCurrentStep(firstStep);
     }
   };
 
@@ -293,6 +406,7 @@ function ParivaarRegistrationForm({
     setValues(INITIAL_FORM);
     setErrors({});
     setCopiedId(false);
+    setCurrentStep(0);
     resetSubmission();
   };
 
@@ -805,6 +919,99 @@ function ParivaarRegistrationForm({
               data-testid="parivaar-registration-form"
             >
               <div className="space-y-6">
+              {/* Wizard progress: 4 steps, current position, back/next */}
+              <div data-testid="reg-step-indicator">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span
+                    className="text-[11px] sm:text-xs font-bold"
+                    style={{ color: "var(--maroon)" }}
+                  >
+                    {(regSteps.stepOf || "चरण {current} / {total}")
+                      .replace("{current}", String(currentStep + 1))
+                      .replace("{total}", String(TOTAL_STEPS))}
+                  </span>
+                  <span
+                    className="text-[11px] font-semibold"
+                    style={{ color: "#8B7355" }}
+                  >
+                    🔒 {t.privateFieldBadge}
+                  </span>
+                </div>
+
+                <ol className="grid grid-cols-4 gap-1.5">
+                  {STEPS.map((step, index) => {
+                    const done = index < currentStep;
+                    const current = index === currentStep;
+                    return (
+                      <li key={step.id} className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => goToStep(index)}
+                          disabled={index > currentStep}
+                          aria-current={current ? "step" : undefined}
+                          data-testid={`reg-step-${index + 1}`}
+                          className="w-full flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 cursor-pointer disabled:cursor-not-allowed"
+                          style={{
+                            minHeight: "56px",
+                            backgroundColor: current
+                              ? "rgba(139,26,26,0.08)"
+                              : "transparent",
+                            border: current
+                              ? "1px solid rgba(139,26,26,0.28)"
+                              : "1px solid transparent",
+                          }}
+                        >
+                          <span
+                            className="inline-flex items-center justify-center rounded-full font-bold"
+                            style={{
+                              width: "26px",
+                              height: "26px",
+                              fontSize: "0.72rem",
+                              backgroundColor: current
+                                ? "var(--maroon)"
+                                : done
+                                  ? "var(--gold)"
+                                  : "#EDE3D2",
+                              color: current
+                                ? "var(--gold)"
+                                : done
+                                  ? "var(--maroon)"
+                                  : "#8B7355",
+                            }}
+                            aria-hidden="true"
+                          >
+                            {done ? "✓" : index + 1}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold leading-tight text-center"
+                            style={{ color: current ? "var(--maroon)" : "#6B5B4B" }}
+                          >
+                            {step.label}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+
+                <div
+                  className="mt-1.5 h-1.5 rounded-full overflow-hidden"
+                  style={{ backgroundColor: "rgba(139,26,26,0.12)" }}
+                  aria-hidden="true"
+                >
+                  <div
+                    style={{
+                      width: `${((currentStep + 1) / TOTAL_STEPS) * 100}%`,
+                      height: "100%",
+                      backgroundColor: "var(--gold)",
+                      transition: "width 0.25s ease",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {currentStep === 0 && (
+                <>
                 {/* Part A: Family Details */}
                 <div
                   className="rounded-xl p-4 sm:p-5 space-y-4"
@@ -830,7 +1037,6 @@ function ParivaarRegistrationForm({
                       className="block text-xs sm:text-sm font-bold mb-1.5"
                       style={{ color: "var(--maroon)" }}
                     >
-                      1.{" "}
                       {t.fieldHeadNameLabel ||
                         "परिवार के मुखिया का नाम (Family Head's Name)"}{" "}
                       <span
@@ -917,62 +1123,14 @@ function ParivaarRegistrationForm({
                   </div>
 
                   {/* 3. Number of Family Members & 4. Mobile Number */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="parivaar-member-count"
-                        className="block text-xs sm:text-sm font-bold mb-1.5"
-                        style={{ color: "var(--maroon)" }}
-                      >
-                        2.{" "}
-                        {t.fieldMemberCountLabel ||
-                          "परिवार के सदस्यों की संख्या (Number of Family Members)"}{" "}
-                        <span
-                          className="font-normal text-xs"
-                          style={{ color: "#8B7355" }}
-                        >
-                          ({t.requiredText})
-                        </span>
-                      </label>
-                      <input
-                        id="parivaar-member-count"
-                        data-testid="reg-member-count-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={250}
-                        step={1}
-                        required
-                        value={values.memberCount}
-                        onChange={handleFieldChange("memberCount")}
-                        placeholder={
-                          t.fieldMemberCountPlaceholder || "जैसे: 5 (e.g. 5)"
-                        }
-                        style={{
-                          ...inputStyle,
-                          borderColor: errors.memberCount
-                            ? "#B91C1C"
-                            : "rgba(212,175,55,0.65)",
-                        }}
-                      />
-                      {errors.memberCount && (
-                        <p
-                          className="text-xs font-semibold mt-1"
-                          style={{ color: "#B91C1C" }}
-                          role="alert"
-                        >
-                          {errors.memberCount}
-                        </p>
-                      )}
-                    </div>
-
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label
                         htmlFor="parivaar-phone"
                         className="block text-xs sm:text-sm font-bold mb-1.5"
                         style={{ color: "var(--maroon)" }}
                       >
-                        3. {t.fieldPhoneLabel}{" "}
+                        {t.fieldPhoneLabel}{" "}
                         <span
                           className="font-normal text-xs"
                           style={{ color: "#8B7355" }}
@@ -1022,7 +1180,81 @@ function ParivaarRegistrationForm({
                     </div>
                   </div>
                 </div>
+                </>
+              )}
 
+              {currentStep === 1 && (
+                <div
+                  className="rounded-xl p-4 sm:p-5 space-y-3"
+                  style={{
+                    backgroundColor: "#FFFBF2",
+                    border: "1px solid rgba(212,175,55,0.55)",
+                  }}
+                  data-testid="reg-step-members-panel"
+                >
+                  <h3
+                    className="text-sm sm:text-base font-bold pb-1.5 border-b"
+                    style={{
+                      color: "var(--maroon)",
+                      borderColor: "rgba(212,175,55,0.35)",
+                    }}
+                  >
+                    👨‍👩‍👧‍👦 {regSteps.members || "सदस्य (Members)"}
+                  </h3>
+                  <p className="text-xs leading-relaxed" style={{ color: "#5C4A38" }}>
+                    अपने परिवार में शामिल कुल सदस्यों की संख्या दर्ज करें। (Enter the total number of members in your family.)
+                  </p>
+<div>
+                      <label
+                        htmlFor="parivaar-member-count"
+                        className="block text-xs sm:text-sm font-bold mb-1.5"
+                        style={{ color: "var(--maroon)" }}
+                      >
+                        {t.fieldMemberCountLabel ||
+                          "परिवार के सदस्यों की संख्या (Number of Family Members)"}{" "}
+                        <span
+                          className="font-normal text-xs"
+                          style={{ color: "#8B7355" }}
+                        >
+                          ({t.requiredText})
+                        </span>
+                      </label>
+                      <input
+                        id="parivaar-member-count"
+                        data-testid="reg-member-count-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={250}
+                        step={1}
+                        required
+                        value={values.memberCount}
+                        onChange={handleFieldChange("memberCount")}
+                        placeholder={
+                          t.fieldMemberCountPlaceholder || "जैसे: 5 (e.g. 5)"
+                        }
+                        style={{
+                          ...inputStyle,
+                          borderColor: errors.memberCount
+                            ? "#B91C1C"
+                            : "rgba(212,175,55,0.65)",
+                        }}
+                      />
+                      {errors.memberCount && (
+                        <p
+                          className="text-xs font-semibold mt-1"
+                          style={{ color: "#B91C1C" }}
+                          role="alert"
+                        >
+                          {errors.memberCount}
+                        </p>
+                      )}
+                    </div>
+                </div>
+              )}
+
+              {currentStep === 2 && (
+                <>
                 {/* Part B: Ancestral Location (Official LGD Hierarchy -> Generates Family ID) */}
                 <div
                   className="rounded-xl p-4 sm:p-5 space-y-4"
@@ -1053,7 +1285,7 @@ function ParivaarRegistrationForm({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <SearchableSelect
                       id="parivaar-state"
-                      label={`4. ${t.fieldStateLabel}`}
+                      label={t.fieldStateLabel}
                       required
                       requiredText={t.requiredText}
                       optionalText={t.optionalText}
@@ -1068,7 +1300,7 @@ function ParivaarRegistrationForm({
 
                     <SearchableSelect
                       id="parivaar-district"
-                      label={`5. ${t.fieldDistrictLabel}`}
+                      label={t.fieldDistrictLabel}
                       required
                       requiredText={t.requiredText}
                       optionalText={t.optionalText}
@@ -1092,7 +1324,7 @@ function ParivaarRegistrationForm({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <SearchableSelect
                       id="parivaar-subdistrict"
-                      label={`6. ${t.fieldSubdistrictLabel}`}
+                      label={t.fieldSubdistrictLabel}
                       required
                       requiredText={t.requiredText}
                       optionalText={t.optionalText}
@@ -1113,7 +1345,7 @@ function ParivaarRegistrationForm({
 
                     <SearchableSelect
                       id="parivaar-village"
-                      label={`7. ${t.fieldVillageLabel}`}
+                      label={t.fieldVillageLabel}
                       required
                       requiredText={t.requiredText}
                       optionalText={t.optionalLgdVillageText}
@@ -1177,7 +1409,11 @@ function ParivaarRegistrationForm({
                     </div>
                   )}
                 </div>
+                </>
+              )}
 
+              {currentStep === 3 && (
+                <>
                 {/* Part C: Current Residence (Separate from Ancestral Village, Never Used for Family ID) */}
                 <div
                   className="rounded-xl p-4 sm:p-5 space-y-3"
@@ -1200,7 +1436,7 @@ function ParivaarRegistrationForm({
                       className="block text-xs sm:text-sm font-bold mb-1.5"
                       style={{ color: "var(--maroon)" }}
                     >
-                      8. {t.fieldCurrentAddressLabel}{" "}
+                      {t.fieldCurrentAddressLabel}{" "}
                       <span
                         className="font-normal text-xs"
                         style={{ color: "#8B7355" }}
@@ -1239,7 +1475,6 @@ function ParivaarRegistrationForm({
                     )}
                   </div>
                 </div>
-
                 {/* Backend submission error alert */}
                 {submitError && (
                   <div
@@ -1265,14 +1500,33 @@ function ParivaarRegistrationForm({
                     </p>
                   </div>
                 )}
+                </>
+              )}
 
-                {/* Submit Registration Button */}
-                <div className="pt-1">
+              {/* Back / Next · on the last step Next becomes Submit */}
+              <div className="flex items-stretch gap-2 pt-1" data-testid="reg-step-nav">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={currentStep === 0 || submitting}
+                  data-testid="reg-back-btn"
+                  className="px-4 rounded-xl font-bold text-sm disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                  style={{
+                    minHeight: "50px",
+                    backgroundColor: "#FFFFFF",
+                    color: "var(--maroon)",
+                    border: "2px solid var(--gold)",
+                  }}
+                >
+                  ← {regSteps.back || "पीछे जाएं (Back)"}
+                </button>
+
+                {currentStep === TOTAL_STEPS - 1 ? (
                   <button
                     type="submit"
                     disabled={submitting}
                     data-testid="reg-submit-btn"
-                    className="w-full sm:w-auto px-9 py-3.5 rounded-xl sm:rounded-full font-bold text-base shadow-md transition-transform active:scale-98 sm:hover:scale-105 disabled:opacity-60 cursor-pointer"
+                    className="flex-1 rounded-xl font-bold text-base shadow-md transition-transform active:scale-98 disabled:opacity-60 cursor-pointer"
                     style={{
                       minHeight: "50px",
                       backgroundColor: "var(--gold)",
@@ -1282,7 +1536,23 @@ function ParivaarRegistrationForm({
                   >
                     {submitting ? t.submittingBtnLabel : t.submitBtnLabel}
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    data-testid="reg-next-btn"
+                    className="flex-1 rounded-xl font-bold text-base shadow-md transition-transform active:scale-98 cursor-pointer"
+                    style={{
+                      minHeight: "50px",
+                      backgroundColor: "var(--gold)",
+                      color: "var(--maroon)",
+                      border: "2px solid var(--maroon)",
+                    }}
+                  >
+                    {regSteps.next || "आगे बढ़ें (Next)"} →
+                  </button>
+                )}
+              </div>
               </div>
             </form>
           )}
