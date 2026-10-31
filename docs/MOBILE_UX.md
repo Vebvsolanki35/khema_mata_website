@@ -1,104 +1,74 @@
 # Mobile-first UX structure
 
-This document describes the phone-first layout introduced for the Khemaj Mata
-Temple / Solanki Parivaar site. **No route, API, Supabase table, RPC, Family ID
-rule or admin permission changed** — only how existing pages are presented and
-reached on small screens.
+This document describes the phone-first public site for the Khemaj Mata Temple
+and Solanki Parivaar. It is a presentation change only — the Supabase project,
+environment variables, Parivaar registration/directory, Family IDs, admin access,
+donation flow and trust data are untouched.
 
-## 1. Navigation
+## 1. Exactly five navigation tabs
 
-| Surface | Contents |
+| # | Hindi label | Short bottom-tab label | Route | Icon |
+|---|---|---|---|---|
+| 1 | मुख्य पृष्ठ | मुख्य | `/` | 🏠 |
+| 2 | मंदिर एवं विरासत | विरासत | `/temple` | 🛕 |
+| 3 | दर्शन एवं आरती | दर्शन | `/darshan` | 🔔 |
+| 4 | सोलंकी परिवार | परिवार | `/parivaar` | 👨‍👩‍👧‍👦 |
+| 5 | ट्रस्ट एवं सेवा | सेवा | `/donation` | 🙏 |
+
+- `src/data/navigation.js` is the single source of truth. `BOTTOM_TABS` is derived
+  from `SECTIONS`, so the header, the fixed mobile bar and the footer can never
+  list different destinations.
+- There is **no hamburger drawer and no "More" sheet**: all five destinations are
+  one tap away. Short labels keep the bar readable at 360 px; the full Hindi name
+  is exposed through `aria-label` and on desktop (`2xl` breakpoint).
+- Active state: the current tab is gold with maroon text and `aria-current="page"`.
+- Sub-pages (`/history`, `/facilities`, `/gallery`, `/trust`, `/contact`) are
+  reached from their section page and from the footer. They are not extra tabs.
+
+## 2. Removed from the public site
+
+| Removed | Details |
 |---|---|
-| Top bar (all public pages) | Temple identity, `हिं / EN / ગુ` language switch, WhatsApp and Donate actions on `sm+` |
-| Fixed bottom bar (`< md`) | **Home · Parivaar · Temple · Seva · More** |
-| **More** sheet | Every remaining existing page: Temple & Heritage (`/temple`, `/history`, `/facilities`, `/gallery`), Darshan (`/darshan`, `/calendar`), Visit (`/visit`, `/planner`), Trust & Seva (`/donation`, `/trust`, `/contact`), Admin login, language switch, WhatsApp group |
-| Desktop (`lg+`) | The original six-section tab bar (unchanged) |
-| Footer | Full link list built from `SECTIONS` (unchanged) |
+| Yatra / यात्रा योजना (`/visit`, `/planner`) | Pages, travel-season/hotel/travel-tip sections, weather widget and travel route data deleted |
+| Tyohar / त्योहार calendar (`/calendar`) plus festival blocks on Home, Temple and Darshan | Deleted; the festival data file is gone |
+| Public reviews / श्रद्धालुओं के अनुभव | `Testimonials` component removed from the site |
+| Visitor gallery upload | Upload button, storage upload and DB insert removed from `/gallery`; the gallery is display-only (trust photograph + approved rows + existing photos). Admin gallery management is unchanged |
+| Duplicate darshan timings | Timings + aarti now render **only** on `/darshan`. Removed from Home, Temple, Footer and the Ticker; those places link to the Darshan page instead |
 
-`src/data/navigation.js` remains the single source of truth:
+Removed routes now fall through to the SPA's normal behaviour (no page). No
+database tables, rows, storage buckets, API routes or admin screens were deleted.
 
-- `SECTIONS` — the six public sections (id order is asserted by
-  `scripts/test-parivaar.mjs`, unchanged).
-- `BOTTOM_TABS` — the five bottom tabs (a view over existing routes).
-- `MORE_MENU_GROUPS` — the More sheet contents; every entry must already exist
-  as a public route (or `/admin/login`), which the test suite enforces.
-- `isBottomTabActive()` — active-state helper (admin routes highlight nothing).
+## 3. Homepage
 
-The old mobile hamburger drawer was **removed** so there is only one mobile
-navigation system. Admin routes (`/admin`, `/admin/login`) still render with no
-public chrome at all.
+Order: hero (temple name, location, one photograph, one Darshan CTA) → four quick
+actions (दर्शन समय, सोलंकी परिवार, दान करें, WhatsApp) → important notices
+(only when published) → short introduction with a link to the heritage page.
 
-## 2. Home
+Nothing else: no statistics band, no duplicate donation block, no volunteer form,
+no reviews, no photo strip, no festival grid. Volunteering stays on the Trust &
+Seva page (`/donation`), where it already existed.
 
-Order: compact hero (two primary actions) → six action cards (Register Family,
-Find Family, Community Map, Temple, Donate, Gallery) → live notices → collapsed
-temple timings/aarti/festivals/general information → compact stats → donation
-CTA → volunteer form → testimonials → photo strip → heritage summary.
+## 4. Darshan & Aarti
 
-Long content sits behind a shared `ReadMore` component
-(`src/components/ui/ReadMore.jsx`), which renders a real `<button>` with
-`aria-expanded` / `aria-controls`. Nothing is hidden from search engines.
+`/darshan` shows the darshan timings and the aarti schedule and nothing else. All
+values come from the existing translation data (`t.darshan.*`, `t.temple.aartis`),
+so the trust can update the schedule in one place — no new timings were invented.
 
-## 3. Parivaar
+## 5. Parivaar / Trust & Seva (unchanged behaviour)
 
-`/parivaar` opens with a shortened hero plus **three** landing actions —
-Register Family, Find Family, Community Map — which jump to the existing
-sections `#parivaar-register`, `#parivaar-directory`, `#parivaar-map`.
+- `/parivaar` keeps the three landing actions (Register / Find / Map), the 4-step
+  registration wizard (Family details → Members → Ancestral village → Address &
+  review), the directory search and the community map. The last step repeats every
+  earlier answer in a review card whose "बदलें" (Change) buttons jump back to the
+  owning step; nothing is submitted until the final step, and the submit call,
+  validator and Family-ID workflow are unchanged. Picking a village on the map
+  opens the wizard directly on the village step.
+- `/donation` keeps bank details, payment QR, UPI IDs, seva amounts, the volunteer
+  form, WhatsApp contact; `/trust` and `/contact` are unchanged.
+- Floating Donate/WhatsApp pills are desktop-only, so they can never cover a
+  phone's bottom navigation, form fields or submit buttons.
 
-The five original sections (Overview, Map, Directory, Register, Help) and their
-labels are untouched. Deep links work from anywhere on the site:
-
-```
-/parivaar#register   → #parivaar-register
-/parivaar#directory  → #parivaar-directory
-/parivaar#map        → #parivaar-map
-/parivaar#help       → #parivaar-help
-```
-
-`ScrollToTop` in `src/App.jsx` now respects `#hash`, so deep links do not land at
-the top of the page.
-
-## 4. Family directory
-
-- One prominent search box: **Family ID, family-head name or village**
-  (`data-testid="directory-search-input"`).
-- Advanced location filters (State → District → Tehsil → Village) live in one
-  collapsible panel (`data-testid="directory-mobile-filter-toggle"`), collapsed
-  by default at every breakpoint, with an active-filter count badge and the
-  existing "clear filters" action.
-
-## 5. Registration wizard
-
-Four steps over the **same** `values` state object, ending in the **same**
-`submitRegistration` call:
-
-1. **Family Details** — head name, father's name, mobile number
-2. **Members** — number of family members
-3. **Ancestral Village** — State → District → Tehsil/Block → Village (official
-   LGD hierarchy, sequential and dependent)
-4. **Current Address & Review** — private current address, a review card with
-   "change" links back to earlier steps, then Submit
-
-Behaviour:
-
-- Progress chips + bar (`data-testid="reg-step-indicator"`); future steps are
-  locked, completed steps can be revisited.
-- Per-step validation reuses `src/lib/validateParivaar.js` — the same rules used
-  by the server/API tests. No duplicate validation logic.
-- Values survive Back/Next and jumping between steps.
-- Submitting re-checks every step and jumps to the first invalid one, focusing
-  the offending control.
-- Family IDs are still generated in the database only; nothing about ID
-  generation, editing or deletion changed.
-
-## 6. Floating buttons
-
-The Donate/WhatsApp floating dock is now **desktop-only**. On phones the same
-actions are always one tap away in the bottom bar (Seva) and the More sheet, and
-the page reserves bottom space (`--bottom-nav-h` + safe-area inset) so nothing
-is ever covered.
-
-## 7. Verification
+## 6. Verification
 
 ```bash
 npm run lint
@@ -107,13 +77,20 @@ npm run test:parivaar:sql
 npm run build
 ```
 
-Manual phone check (360 / 390 / 430 px):
+Structural checks (React render in jsdom, no layout engine): five fixed tabs with
+the required labels, active tab follows the section on child routes, the wizard's
+Back/Next preserves values, the review card repeats the entered data, and the
+Darshan timings render on `/darshan` only.
 
-- bottom bar always visible, all five labels readable, active tab highlighted
-- More sheet scrolls, closes on Escape/backdrop/selection
-- Home action cards tappable (≥ 44 px), "Read more" expands
-- Parivaar 3 actions jump to the right sections
-- wizard: Back/Next preserve values, invalid steps blocked, submit disabled while
-  sending
-- directory: search first, filters collapsed until needed
-- language switch (हिंदी / English / ગુજરાતી) updates nav, cards and step labels
+**These are not pixel measurements.** No real browser is available in this
+environment, so the 360 / 390 / 430 px checklist below still has to be walked
+once by hand on a phone or in DevTools device mode:
+
+- five tabs visible with readable Hindi labels, no horizontal scrolling
+- active tab clearly highlighted; page changes close any transient UI
+- Home has exactly four quick actions and no long card grids
+- Darshan timings appear on `/darshan` only
+- Parivaar wizard Back/Next preserves values; review card and directory work
+- donation, trust, contact and WhatsApp links still open
+- floating Donate/WhatsApp pills appear on desktop only
+- language switch (हिंदी / English / ગુજરાતી) updates nav and cards

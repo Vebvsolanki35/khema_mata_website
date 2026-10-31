@@ -9,10 +9,10 @@ function FacilitiesHero() {
 
   return (
     <section
-      className="py-16 px-4 text-center"
+      className="py-10 sm:py-14 px-4 text-center"
       style={{ background: "linear-gradient(135deg, var(--maroon), #5A0E0E)" }}
     >
-      <div className="text-5xl mb-4">⭐</div>
+      <div className="text-3xl sm:text-4xl mb-2.5">⭐</div>
       <h1
         className="text-3xl md:text-4xl font-bold mb-2"
         style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}

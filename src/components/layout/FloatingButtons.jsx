@@ -7,7 +7,7 @@ import { useLanguage } from "../../context/useLanguage";
  * Desktop-only floating shortcuts.
  *
  * On phones (`< md`) this dock is hidden entirely — the fixed bottom navigation
- * already offers Donate (Seva tab) and WhatsApp (More sheet + footer), so no
+ * already offers Donate (Seva tab) and WhatsApp (footer + contact page), so no
  * floating control can ever cover a form field or the nav. On desktop the two
  * pills stay in the corner where they have room and cover nothing.
  */

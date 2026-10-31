@@ -111,6 +111,8 @@ function ParivaarRegistrationForm({
         villageCode: prefillLocation.villageCode || "",
       }));
       setErrors({});
+      // Land on the ancestral-village step, which is what was just picked.
+      setCurrentStep(2);
     });
     return () => {
       active = false;
@@ -1414,6 +1416,99 @@ function ParivaarRegistrationForm({
 
               {currentStep === 3 && (
                 <>
+                {/* Review card — every step at a glance before the final submit.
+                    Each row offers a jump back to the step that owns the field. */}
+                <div
+                  className="rounded-xl p-4 sm:p-5 space-y-2.5"
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    border: "1.5px solid rgba(212,175,55,0.65)",
+                  }}
+                  data-testid="reg-review-card"
+                >
+                  <h3
+                    className="text-sm sm:text-base font-bold pb-1.5 border-b"
+                    style={{
+                      color: "var(--maroon)",
+                      borderColor: "rgba(212,175,55,0.35)",
+                    }}
+                  >
+                    🧾{" "}
+                    {regSteps.reviewTitle ||
+                      "अपना विवरण जाँचें (Review your details)"}
+                  </h3>
+                  <dl className="space-y-2 text-xs sm:text-sm" style={{ color: "#4A3728" }}>
+                    {[
+                      {
+                        label: t.fieldHeadNameLabel || t.fieldNameLabel,
+                        value: values.fullName,
+                        step: 0,
+                      },
+                      {
+                        label: t.fieldFatherNameLabel,
+                        value: values.fatherName,
+                        step: 0,
+                      },
+                      {
+                        label: t.fieldPhoneLabel,
+                        value: values.phoneNumber,
+                        step: 0,
+                      },
+                      {
+                        label: t.fieldMemberCountLabel,
+                        value: values.memberCount,
+                        step: 1,
+                      },
+                      {
+                        label: t.fieldVillageLabel || "गाँव (Village)",
+                        value: [
+                          selectedVillageObj?.name_en || selectedVillageName,
+                          selectedSubdistrictObj?.name_en,
+                          selectedDistrictObj?.name_en,
+                          selectedStateObj?.name_en,
+                        ]
+                          .filter(Boolean)
+                          .join(", "),
+                        step: 2,
+                      },
+                      {
+                        label: t.fieldCurrentAddressLabel,
+                        value: values.currentAddress,
+                        step: 3,
+                      },
+                    ].map((row) => (
+                      <div
+                        key={row.label}
+                        className="flex items-start justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <dt
+                            className="text-[11px] font-semibold"
+                            style={{ color: "#8B7355" }}
+                          >
+                            {row.label}
+                          </dt>
+                          <dd className="font-semibold break-words">
+                            {row.value || "—"}
+                          </dd>
+                        </div>
+                        {row.step < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => goToStep(row.step)}
+                            data-testid={`reg-review-edit-${row.step + 1}`}
+                            className="shrink-0 rounded px-2 py-1.5 text-xs font-bold underline cursor-pointer"
+                            style={{ color: "var(--maroon)", minHeight: "36px" }}
+                            aria-label={`${regSteps.edit || "बदलें"} — ${row.label}`}
+                          >
+                            {regSteps.edit || "बदलें"}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
                 {/* Part C: Current Residence (Separate from Ancestral Village, Never Used for Family ID) */}
                 <div
                   className="rounded-xl p-4 sm:p-5 space-y-3"

@@ -1,97 +1,63 @@
-import { useLocation, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../../context/useLanguage";
 import { BOTTOM_TABS, isBottomTabActive } from "../../data/navigation";
-import MoreSheet from "./MoreSheet";
 
 /**
  * Fixed bottom navigation (phones/tablets only, hidden on `md`+ where the full
  * header tab bar is visible).
  *
- * Five destinations: Home · Parivaar · Temple · Seva · More.
- * Four are real routes; "More" opens the existing-pages sheet. This is the only
- * mobile navigation system — the header's hamburger drawer has been removed so
- * the two never compete.
+ * Exactly the five required destinations — Home · Temple & Heritage · Darshan &
+ * Aarti · Solanki Parivaar · Trust & Seva. No "More" drawer: every tab is one
+ * tap away, labels stay short enough for a 360px screen, and the full Hindi name
+ * is exposed to assistive technology via `aria-label`.
  */
-function BottomNav({ open, onOpenChange }) {
+function BottomNav() {
   const { t } = useLanguage();
   const { pathname } = useLocation();
-  const ui = t.mobileUi || {};
 
   // Bottom tabs must stay short on a 360px screen, so bilingual labels are
   // reduced to their primary name ("परिवार (Parivaar)" → "परिवार").
   const shortLabel = (value) => String(value || "").split("(")[0].trim();
 
-  const labelFor = (tab) => {
-    if (tab.id === "more") return ui.more || "More";
-    return shortLabel(t.nav[tab.labelKey]) || tab.description;
-  };
-
   return (
-    <>
-      <nav
-        className="bottom-nav md:hidden"
-        aria-label="मुख्य नेविगेशन (Primary mobile navigation)"
-        data-testid="bottom-nav"
-      >
-        <ul className="max-w-lg mx-auto grid grid-cols-5">
-          {BOTTOM_TABS.map((tab) => {
-            const active = isBottomTabActive(tab, pathname);
-            const inner = (
-              <>
+    <nav
+      className="bottom-nav md:hidden"
+      aria-label="मुख्य नेविगेशन (Primary mobile navigation)"
+      data-testid="bottom-nav"
+    >
+      <ul className="max-w-lg mx-auto grid grid-cols-5">
+        {BOTTOM_TABS.map((tab) => {
+          const active = isBottomTabActive(tab, pathname);
+          const fullLabel = t.nav[tab.fullLabelKey] || tab.id;
+
+          return (
+            <li key={tab.id}>
+              {/* A plain Link, not NavLink: NavLink recomputes aria-current from
+                  its own exact match, which would drop the active state on
+                  sub-pages such as /gallery or /contact. */}
+              <Link
+                to={tab.to}
+                aria-current={active ? "page" : undefined}
+                aria-label={fullLabel}
+                data-testid={`bottom-nav-${tab.id}`}
+                className="bottom-nav-item"
+                style={{
+                  color: active ? "var(--maroon)" : "#FFF8F0",
+                  backgroundColor: active ? "var(--gold)" : "transparent",
+                }}
+              >
                 <span aria-hidden="true" className="text-xl leading-none">
                   {tab.icon}
                 </span>
-                <span className="text-[11px] font-bold leading-tight text-center">
-                  {labelFor(tab)}
+                <span className="text-xs font-bold leading-tight text-center">
+                  {shortLabel(t.nav[tab.labelKey]) || fullLabel}
                 </span>
-              </>
-            );
-
-            if (tab.id === "more") {
-              return (
-                <li key={tab.id}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenChange(true)}
-                    aria-expanded={open}
-                    aria-controls="more-sheet"
-                    aria-haspopup="dialog"
-                    data-testid="bottom-nav-more"
-                    className="bottom-nav-item"
-                    style={{
-                      color: open ? "var(--maroon)" : "#FFF8F0",
-                      backgroundColor: open ? "var(--gold)" : "transparent",
-                    }}
-                  >
-                    {inner}
-                  </button>
-                </li>
-              );
-            }
-
-            return (
-              <li key={tab.id}>
-                <NavLink
-                  to={tab.to}
-                  end={tab.to === "/"}
-                  aria-current={active ? "page" : undefined}
-                  data-testid={`bottom-nav-${tab.id}`}
-                  className="bottom-nav-item"
-                  style={{
-                    color: active ? "var(--maroon)" : "#FFF8F0",
-                    backgroundColor: active ? "var(--gold)" : "transparent",
-                  }}
-                >
-                  {inner}
-                </NavLink>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      <MoreSheet open={open} onClose={() => onOpenChange(false)} />
-    </>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 

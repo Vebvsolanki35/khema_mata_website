@@ -359,7 +359,8 @@ textarea:focus-visible {
 
 
 /* =========================================================================
-   Fixed mobile bottom navigation (Home · Parivaar · Temple · Seva · More)
+   Fixed mobile bottom navigation — Home · Temple & Heritage · Darshan &
+   Aarti · Solanki Parivaar · Trust & Seva
    ========================================================================= */
 .bottom-nav {
   position: fixed;
@@ -396,126 +397,6 @@ textarea:focus-visible {
 
 .bottom-nav-item:active {
   transform: scale(0.97);
-}
-
-/* =========================================================================
-   "More" bottom sheet (secondary destinations + language + WhatsApp)
-   ========================================================================= */
-.more-sheet-root {
-  position: fixed;
-  inset: 0;
-  z-index: 130;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.more-sheet-backdrop {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  border: 0;
-  background: rgba(24, 12, 6, 0.58);
-  cursor: pointer;
-}
-
-.more-sheet-panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  max-height: 88vh;
-  padding-top: 6px;
-  background: var(--cream);
-  border-top: 3px solid var(--gold);
-  border-top-left-radius: 22px;
-  border-top-right-radius: 22px;
-  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.32);
-  animation: sheet-up 0.22s ease-out;
-}
-
-.more-sheet-handle {
-  width: 44px;
-  height: 4px;
-  flex: 0 0 auto;
-  margin: 4px auto 8px;
-  border-radius: 9999px;
-  background: rgba(139, 26, 26, 0.28);
-}
-
-.more-sheet-body {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 16px calc(20px + env(safe-area-inset-bottom, 0px));
-}
-
-.more-sheet-primary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: var(--maroon);
-  color: var(--gold);
-  border: 1.5px solid var(--gold);
-  text-decoration: none;
-}
-
-.more-sheet-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(212, 175, 55, 0.6);
-  color: var(--maroon);
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-decoration: none;
-}
-
-.more-sheet-link:active,
-.more-sheet-primary:active {
-  transform: scale(0.98);
-}
-
-.more-sheet-lang {
-  min-height: 44px;
-  border-radius: 12px;
-  border: 1.5px solid;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.more-sheet-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 46px;
-  border-radius: 12px;
-  font-weight: 700;
-  background: var(--gold);
-  color: var(--maroon);
-  text-decoration: none;
-}
-
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .more-sheet-panel {
-    animation: none;
-  }
 }
 
 /* Deep links such as /parivaar#register must not hide behind the sticky header */

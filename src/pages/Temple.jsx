@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import { HistoryContent } from "./History";
 import { FacilitiesContent } from "./Facilities";
@@ -11,12 +12,13 @@ import { GalleryContent } from "./Gallery";
  *   2. temple history
  *   3. Solanki dynasty history and heritage  (<HistoryContent/>)
  *   4. temple facilities and visitor information (<FacilitiesContent/>)
- *   5. photo gallery, incl. the authentic trust-supplied photograph
- *   6. festivals and other cultural content
+ *   5. photo gallery (display-only, incl. the authentic trust photograph)
  *
- * There is no secondary tab bar: each former sub-page contributes its real
- * component, rendered inline. Nothing is duplicated — /history, /facilities
- * and /gallery still render the very same components standalone.
+ * Darshan and aarti timings are NOT repeated here — they live only on
+ * /darshan, linked from the card below the information table. There is no
+ * secondary tab bar: each former sub-page contributes its real component,
+ * rendered inline, and /history, /facilities and /gallery still render the
+ * very same components standalone.
  */
 function Temple() {
   const { t } = useLanguage();
@@ -26,12 +28,12 @@ function Temple() {
     <main>
       {/* Hero Banner */}
       <section
-        className="relative py-20 px-4 text-center"
+        className="relative py-10 sm:py-14 px-4 text-center"
         style={{
           backgroundImage: "linear-gradient(135deg, var(--maroon) 0%, #6B1313 100%)",
         }}
       >
-        <div className="text-5xl mb-4">🛕</div>
+        <div className="text-3xl sm:text-4xl mb-2.5">🛕</div>
         <h1
           className="text-3xl md:text-5xl font-bold mb-2"
           style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
@@ -70,54 +72,39 @@ function Temple() {
 
       <div className="gold-divider mx-8" />
 
-      {/* Darshan Timings + Aarti */}
-      <section className="py-12 px-4 bg-white">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
-          {/* Darshan */}
-          <div>
-            <h2 className="section-title text-xl font-bold">{tp.darshanTitle}</h2>
-            <div className="space-y-3 mt-6">
-              {[
-                { icon: "🌅", label: t.darshan.morning, time: t.darshan.morningTime },
-                { icon: "🌇", label: t.darshan.evening, time: t.darshan.eveningTime },
-                { icon: "🎉", label: t.darshan.navratri, time: t.darshan.navratriTime },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-4 p-4 rounded-xl"
-                  style={{ backgroundColor: "var(--cream)", border: "1px solid rgba(212,175,55,0.3)" }}
+      {/* Single link to the one page that shows darshan and aarti timings */}
+      <section className="pb-8 px-4 bg-white">
+        <div className="max-w-3xl mx-auto">
+          <Link
+            to="/darshan"
+            className="flex items-center justify-between gap-3 rounded-2xl px-4 py-4"
+            style={{
+              backgroundColor: "var(--cream)",
+              border: "1.5px solid var(--gold)",
+              minHeight: "64px",
+            }}
+            data-testid="temple-darshan-link"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span aria-hidden="true" className="text-xl">
+                🔔
+              </span>
+              <span className="min-w-0">
+                <span
+                  className="block font-bold text-sm sm:text-base"
+                  style={{ color: "var(--maroon)" }}
                 >
-                  <span className="text-2xl">{item.icon}</span>
-                  <div>
-                    <p className="text-sm text-gray-500">{item.label}</p>
-                    <p className="font-bold" style={{ color: "var(--saffron)" }}>{item.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Aarti Schedule */}
-          <div>
-            <h2 className="section-title text-xl font-bold">{tp.aartiTitle}</h2>
-            <div className="space-y-3 mt-6">
-              {tp.aartis.map((a, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-4 rounded-xl"
-                  style={{ backgroundColor: "var(--cream)", borderLeft: "4px solid var(--gold)" }}
-                >
-                  <span
-                    className="font-semibold"
-                    style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-                  >
-                    🔔 {a.name}
-                  </span>
-                  <span className="font-bold" style={{ color: "var(--saffron)" }}>{a.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+                  {t.nav.darshanTab}
+                </span>
+                <span className="block text-[11px] sm:text-xs" style={{ color: "#6B5B4B" }}>
+                  दर्शन एवं आरती का समय देखें
+                </span>
+              </span>
+            </span>
+            <span aria-hidden="true" style={{ color: "var(--gold)" }}>
+              →
+            </span>
+          </Link>
         </div>
       </section>
 
@@ -156,30 +143,6 @@ function Temple() {
       {/* 5 — Photo gallery, incl. the authentic temple photograph (from /gallery) */}
       <GalleryContent />
 
-      {/* 6 — Festivals and other cultural content */}
-      <section className="py-12 px-4 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="section-title text-2xl font-bold">{tp.festivalTitle}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
-            {tp.festivals.map((f, i) => (
-              <div
-                key={i}
-                className="temple-card rounded-2xl p-6 text-center"
-                style={{ backgroundColor: "var(--cream)" }}
-              >
-                <div className="text-3xl mb-3">🎉</div>
-                <h3
-                  className="font-bold text-lg mb-2"
-                  style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
-                >
-                  {f.name}
-                </h3>
-                <p className="text-sm text-gray-600">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </main>
   );
 }

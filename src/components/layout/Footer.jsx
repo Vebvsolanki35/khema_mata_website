@@ -4,6 +4,13 @@ import { WHATSAPP_GROUP_INVITE } from "../../config/constants";
 import { SECTIONS } from "../../data/navigation";
 import WhatsAppButton from "../WhatsAppButton";
 
+/**
+ * Footer — the quiet, secondary directory.
+ *
+ * It lists the sub-pages that are not primary tabs (history, facilities,
+ * gallery, trust, contact) plus the temple address and WhatsApp link. Darshan
+ * timings are deliberately not repeated here; they live on /darshan only.
+ */
 function Footer() {
   const { t } = useLanguage();
   const f = t.footer;
@@ -16,37 +23,37 @@ function Footer() {
         borderTop: "3px solid var(--gold)",
       }}
     >
-      <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {/* Temple identity */}
+      <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
+        {/* Temple identity + contact */}
         <div>
           <div
-            className="font-bold text-lg mb-2"
+            className="font-bold text-base mb-1.5"
             style={{ color: "var(--gold)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
           >
             🛕 {f.templeName}
           </div>
-          <address
-            className="text-sm not-italic leading-relaxed"
-            style={{ color: "#FFF8F0" }}
-          >
+          <address className="text-sm not-italic leading-relaxed" style={{ color: "#FFF8F0" }}>
             देई, बूंदी, राजस्थान ३२३८०२
           </address>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <WhatsAppButton
+              href={WHATSAPP_GROUP_INVITE}
+              iconSize={16}
+              className="px-4 py-2 rounded-full text-xs font-bold justify-center"
+            >
+              {t.whatsappGroup.button}
+            </WhatsAppButton>
+            <Link
+              to="/contact"
+              className="inline-block px-4 py-2 rounded-full text-xs font-bold"
+              style={{ backgroundColor: "var(--gold)", color: "var(--maroon)" }}
+            >
+              📞 {t.nav.contact}
+            </Link>
+          </div>
         </div>
 
-        {/* Darshan timings */}
-        <div>
-          <h3 className="font-bold text-sm mb-2" style={{ color: "var(--gold)" }}>
-            ⏰ {f.darshan}
-          </h3>
-          <ul className="text-sm space-y-1" style={{ color: "#FFF8F0" }}>
-            <li>{f.morning}</li>
-            <li>{f.evening}</li>
-          </ul>
-        </div>
-
-        {/* All pages, grouped by the four primary sections.
-            Built from the same SECTIONS config as the header, so a page can
-            never disappear from the footer just because it is no longer a tab. */}
+        {/* Sub-pages, grouped by their primary section */}
         <nav aria-label={f.quickLinks} className="lg:col-span-2">
           <h3 className="font-bold text-sm mb-2" style={{ color: "var(--gold)" }}>
             🔗 {f.quickLinks}
@@ -63,7 +70,7 @@ function Footer() {
                 </Link>
                 <ul className="text-[13px] space-y-1">
                   {(section.children.length
-                    ? section.children
+                    ? section.children.filter((child) => child.to !== section.to)
                     : [{ to: section.to, labelKey: section.labelKey }]
                   ).map((child) => (
                     <li key={child.to}>
@@ -81,40 +88,23 @@ function Footer() {
             ))}
           </div>
         </nav>
-
-        {/* Connect */}
-        <div>
-          <h3 className="font-bold text-sm mb-2" style={{ color: "var(--gold)" }}>
-            💬 {f.connect}
-          </h3>
-          <WhatsAppButton
-            href={WHATSAPP_GROUP_INVITE}
-            iconSize={16}
-            className="px-4 py-2 rounded-full text-xs"
-          >
-            {t.whatsappGroup.button}
-          </WhatsAppButton>
-          <div className="mt-3">
-            <Link
-              to="/donation"
-              className="inline-block px-4 py-2 rounded-full text-xs font-bold"
-              style={{ backgroundColor: "var(--gold)", color: "var(--maroon)" }}
-            >
-              🙏 {t.mobileDonateBtnLabel}
-            </Link>
-          </div>
-        </div>
       </div>
 
       <div
-        className="text-center text-xs py-4 px-4"
+        className="text-center text-xs py-3.5 px-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1"
         style={{
           color: "#FFF8F0",
           borderTop: "1px solid rgba(212,175,55,0.35)",
           opacity: 0.85,
         }}
       >
-        © {year} {f.templeName} — {f.rights} · {f.builtWith} 🙏
+        <span>
+          © {year} {f.templeName} — {f.rights} · {f.builtWith} 🙏
+        </span>
+        <span aria-hidden="true">·</span>
+        <Link to="/admin/login" style={{ color: "#FFF8F0", textDecoration: "underline" }}>
+          एडमिन लॉगिन (Admin)
+        </Link>
       </div>
     </footer>
   );

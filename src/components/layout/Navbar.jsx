@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../../context/useLanguage";
 import { WHATSAPP_GROUP_INVITE } from "../../config/constants";
 import { SECTIONS, getActiveSection } from "../../data/navigation";
@@ -69,9 +69,11 @@ function Navbar() {
             const on = isActive(s);
             return (
               <li key={s.id} className="min-w-0">
-                <NavLink
+                {/* Link, not NavLink: aria-current must follow the section
+                    (so /gallery highlights Heritage) rather than NavLink's own
+                    exact-match logic. */}
+                <Link
                   to={s.to}
-                  end={s.to === "/"}
                   aria-current={on ? "page" : undefined}
                   data-testid={`nav-tab-${s.id}-desktop`}
                   className="flex items-center justify-center gap-1.5 rounded-lg transition-colors whitespace-nowrap"
@@ -90,7 +92,7 @@ function Navbar() {
                   </span>
                   <span className="hidden 2xl:inline">{fullLabel(s)}</span>
                   <span className="2xl:hidden">{shortLabel(s)}</span>
-                </NavLink>
+                </Link>
               </li>
             );
           })}
