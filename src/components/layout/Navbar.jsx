@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../../context/useLanguage";
-import { WHATSAPP_GROUP_INVITE } from "../../config/constants";
+import { WHATSAPP_CHANNEL_URL } from "../../config/constants";
 import { SECTIONS, getActiveSection } from "../../data/navigation";
 import WhatsAppButton from "../WhatsAppButton";
 
@@ -14,11 +14,11 @@ const LANGS = [
  * Compact top bar.
  *
  * Mobile (< lg): temple identity + language switcher only. Navigation lives in
- * the fixed bottom bar (`BottomNav` → Home / Parivaar / Temple / Seva / More),
- * so there is exactly one mobile navigation system — no drawer duplicating it.
+ * the fixed bottom bar (`BottomNav`, derived from the four SECTIONS), so there
+ * is exactly one mobile navigation system — no drawer duplicating it.
  * Scrolls away naturally; the BottomNav stays fixed.
  *
- * Desktop (lg+): the full six-section tab bar, as before.
+ * Desktop (lg+): the four-section tab bar, centred in the header.
  */
 function Navbar() {
   const { language, setLanguage, t } = useLanguage();
@@ -131,12 +131,12 @@ function Navbar() {
           </div>
 
           <WhatsAppButton
-            href={WHATSAPP_GROUP_INVITE}
+            href={WHATSAPP_CHANNEL_URL}
             showIcon
             iconSize={17}
             className="hidden sm:inline-flex rounded-full justify-center"
             style={{ minWidth: "38px", minHeight: "38px", padding: "0 10px" }}
-            ariaLabel={t.whatsappGroup?.button || "WhatsApp"}
+            ariaLabel={t.whatsappGroup?.button || "Follow Channel"}
           >
             <span className="hidden 2xl:inline">WhatsApp</span>
           </WhatsAppButton>

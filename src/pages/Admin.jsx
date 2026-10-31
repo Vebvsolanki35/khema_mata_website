@@ -232,10 +232,10 @@ function TabAnnouncements() {
 }
 
 const WA_GROUPS = [
-  { key: "temple_update", label: "🛕 मंदिर अपडेट ग्रुप" },
-  { key: "solanki_kul", label: "👥 सोलंकी कुल समूह" },
-  { key: "tirtha_yatra", label: "🚗 तीर्थ यात्रा ग्रुप" },
-  { key: "navratri", label: "🎉 नवरात्रि ग्रुप" },
+  { key: "temple_update", label: "🛕 मंदिर अपडेट चैनल" },
+  { key: "solanki_kul", label: "👥 सोलंकी कुल" },
+  { key: "tirtha_yatra", label: "🚗 तीर्थ यात्रा" },
+  { key: "navratri", label: "🎉 नवरात्रि" },
 ];
 
 function TabWhatsApp() {
@@ -287,14 +287,19 @@ function TabWhatsApp() {
 
   return (
     <form onSubmit={handleSave} className="bg-orange-50 rounded-xl p-5 space-y-4 border border-orange-100 max-w-lg">
-      <h3 className="font-bold text-orange-700">WhatsApp ग्रुप लिंक</h3>
+      <h3 className="font-bold text-orange-700">WhatsApp चैनल लिंक</h3>
+      <p className="text-xs text-gray-600 leading-relaxed">
+        सार्वजनिक वेबसाइट पर केवल एक आधिकारिक WhatsApp चैनल दिखता है, जो
+        <code className="mx-1">src/config/constants.js</code>
+        में सेट है। नीचे दिए लिंक अभी सार्वजनिक पेजों पर नहीं दिखाए जाते।
+      </p>
       {WA_GROUPS.map((g) => (
         <div key={g.key}>
           <label className="block text-sm font-medium text-gray-700 mb-1">{g.label}</label>
           <input
             value={links[g.key]}
             onChange={(e) => setLinks((prev) => ({ ...prev, [g.key]: e.target.value }))}
-            placeholder="https://chat.whatsapp.com/…"
+            placeholder="https://whatsapp.com/channel/…"
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
         </div>
@@ -420,7 +425,7 @@ const TABS = [
   { id: "messages", label: "📩 संदेश" },
   { id: "donations", label: "💰 दान" },
   { id: "announcements", label: "📢 घोषणाएं" },
-  { id: "whatsapp", label: "💬 WhatsApp ग्रुप" },
+  { id: "whatsapp", label: "💬 WhatsApp चैनल" },
   { id: "gallery", label: "🖼️ गैलरी" },
   { id: "content", label: "⚙️ सामग्री" },
   { id: "notices", label: "📻 प्रसारण केंद्र" },

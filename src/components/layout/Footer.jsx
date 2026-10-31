@@ -1,15 +1,16 @@
 import { Link } from "react-router-dom";
 import { useLanguage } from "../../context/useLanguage";
-import { WHATSAPP_GROUP_INVITE } from "../../config/constants";
+import { WHATSAPP_CHANNEL_URL } from "../../config/constants";
 import { SECTIONS } from "../../data/navigation";
 import WhatsAppButton from "../WhatsAppButton";
 
 /**
  * Footer — the quiet, secondary directory.
  *
- * It lists the sub-pages that are not primary tabs (history, facilities,
- * gallery, trust, contact) plus the temple address and WhatsApp link. Darshan
- * timings are deliberately not repeated here; they live on /darshan only.
+ * It lists the sub-pages that are not primary tabs (history, gallery, trust,
+ * contact) plus the temple address and the official WhatsApp channel link.
+ * Darshan timings are deliberately not repeated here; the home page publishes
+ * them once.
  */
 function Footer() {
   const { t } = useLanguage();
@@ -37,7 +38,7 @@ function Footer() {
           </address>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <WhatsAppButton
-              href={WHATSAPP_GROUP_INVITE}
+              href={WHATSAPP_CHANNEL_URL}
               iconSize={16}
               className="px-4 py-2 rounded-full text-xs font-bold justify-center"
             >

@@ -1,35 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLanguage } from "../context/useLanguage";
 import { useContactForm } from "../hooks/useContactForm";
-import { WHATSAPP_GROUP_INVITE, WHATSAPP_GREEN } from "../config/constants";
-import { supabase } from "../lib/supabase";
+import {
+  WHATSAPP_CHANNEL_URL,
+  WHATSAPP_GREEN,
+  EXTERNAL_LINK_REL,
+} from "../config/constants";
 import WhatsAppButton from "../components/WhatsAppButton";
-import WhatsAppGroupSection from "../components/WhatsAppGroupSection";
+import WhatsAppChannelSection from "../components/WhatsAppChannelSection";
 
 /**
- * Only the official, verified group invitation is listed.
- * The previous placeholder links (chat.whatsapp.com/temple, /solanki, /tirtha,
- * /navratri) were not real and have been removed so the page never shows
- * duplicate or contradictory group links.
+ * The temple now runs a single official WhatsApp *Channel* instead of a group.
+ * The old group list (and the `whatsapp_groups` table it was read from) is no
+ * longer rendered, so a stale group link can never reappear on this page.
  */
-const DEFAULT_WA_GROUPS = [
-  { name: "मंदिर अपडेट ग्रुप (आधिकारिक)", link: WHATSAPP_GROUP_INVITE },
-];
 
 function Contact() {
   const { t } = useLanguage();
   const c = t.contact;
-  const [waGroups, setWaGroups] = useState(DEFAULT_WA_GROUPS);
-
-  useEffect(() => {
-    supabase
-      .from("whatsapp_groups")
-      .select("name, link")
-      .limit(4)
-      .then(({ data }) => {
-        if (data && data.length > 0) setWaGroups(data);
-      });
-  }, []);
 
   const [form, setForm] = useState({
     name: "",
@@ -207,7 +195,7 @@ function Contact() {
                   ✅ {c.successMessage}
                 </p>
                 <WhatsAppButton
-                  href={WHATSAPP_GROUP_INVITE}
+                  href={WHATSAPP_CHANNEL_URL}
                   iconSize={16}
                   className="px-5 py-2.5 rounded-full text-sm"
                 >
@@ -237,40 +225,40 @@ function Contact() {
             <div className="space-y-3 text-sm" style={{ color: "#FFF8F0" }}>
               <p>🛕 श्री खेमज माता मंदिर न्यास</p>
               <p>📌 देई, बूंदी, राजस्थान ३२३८०२</p>
-              <p>⏰ प्रातः ५:०० – १२:०० | सायं ४:०० – ९:००</p>
-              <p>🎉 चैत्र नवरात्रि (मार्च–अप्रैल)</p>
-              <p>🎉 शारदीय नवरात्रि (अक्टूबर)</p>
             </div>
           </div>
 
-          {/* WhatsApp Groups */}
+          {/* Official WhatsApp Channel (single source of truth) */}
           <div
-            className="rounded-2xl p-6"
+            className="rounded-2xl p-5 sm:p-6"
             style={{ backgroundColor: "var(--cream)", border: "1px solid rgba(212,175,55,0.4)" }}
+            data-testid="contact-whatsapp-channel"
           >
             <h3
-              className="font-bold text-lg mb-4"
+              className="font-bold text-lg mb-2"
               style={{ color: "var(--maroon)", fontFamily: "'Tiro Devanagari Hindi', serif" }}
             >
-              💬 WhatsApp Groups
+              💬 {t.whatsappGroup.title}
             </h3>
-            <div className="space-y-3">
-              {waGroups.map((grp, i) => (
-                <a
-                  key={i}
-                  href={grp.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl font-semibold text-sm transition-colors hover:opacity-80"
-                  style={{ backgroundColor: WHATSAPP_GREEN, color: "#FFFFFF" }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                  </svg>
-                  {grp.name}
-                </a>
-              ))}
-            </div>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: "#4A3728" }}>
+              {t.whatsappGroup.desc}
+            </p>
+            <WhatsAppButton
+              href={WHATSAPP_CHANNEL_URL}
+              iconSize={18}
+              className="px-5 py-3 rounded-full text-sm w-full sm:w-auto"
+            >
+              {t.whatsappGroup.button}
+            </WhatsAppButton>
+            <a
+              href={WHATSAPP_CHANNEL_URL}
+              target="_blank"
+              rel={EXTERNAL_LINK_REL}
+              className="mt-3 block text-[11px] break-all underline"
+              style={{ color: WHATSAPP_GREEN }}
+            >
+              {WHATSAPP_CHANNEL_URL}
+            </a>
           </div>
 
           {/* Social Links */}
@@ -295,7 +283,7 @@ function Contact() {
                 📘 Facebook
               </a>
               <WhatsAppButton
-                href={WHATSAPP_GROUP_INVITE}
+                href={WHATSAPP_CHANNEL_URL}
                 showIcon={false}
                 className="flex-1 text-center py-2.5 rounded-xl text-sm"
               >
@@ -316,7 +304,7 @@ function Contact() {
       </div>
 
       {/* Dedicated WhatsApp group section (group QR — separate from the bank QR) */}
-      <WhatsAppGroupSection />
+      <WhatsAppChannelSection />
     </main>
   );
 }

@@ -6,10 +6,11 @@ import { BOTTOM_TABS, isBottomTabActive } from "../../data/navigation";
  * Fixed bottom navigation (phones/tablets only, hidden on `md`+ where the full
  * header tab bar is visible).
  *
- * Exactly the five required destinations — Home · Temple & Heritage · Darshan &
- * Aarti · Solanki Parivaar · Trust & Seva. No "More" drawer: every tab is one
- * tap away, labels stay short enough for a 360px screen, and the full Hindi name
- * is exposed to assistive technology via `aria-label`.
+ * Exactly the destinations in `SECTIONS` — Home · Temple & Heritage · Solanki
+ * Parivaar · Trust & Seva (the Darshan & Aarti page was removed and its timings
+ * now live on the home page). No "More" drawer: every tab is one tap away,
+ * labels stay short enough for a 360px screen, and the full Hindi name is
+ * exposed to assistive technology via `aria-label`.
  */
 function BottomNav() {
   const { t } = useLanguage();
@@ -25,7 +26,10 @@ function BottomNav() {
       aria-label="मुख्य नेविगेशन (Primary mobile navigation)"
       data-testid="bottom-nav"
     >
-      <ul className="max-w-lg mx-auto grid grid-cols-5">
+      <ul
+        className="max-w-lg mx-auto grid"
+        style={{ gridTemplateColumns: `repeat(${BOTTOM_TABS.length}, minmax(0, 1fr))` }}
+      >
         {BOTTOM_TABS.map((tab) => {
           const active = isBottomTabActive(tab, pathname);
           const fullLabel = t.nav[tab.fullLabelKey] || tab.id;

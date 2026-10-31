@@ -68,22 +68,27 @@ npm run build
 
 | File | What it controls |
 |---|---|
-| `src/config/constants.js` | WhatsApp **group invitation** URL and the optional direct-chat number |
+| `src/config/constants.js` | Official WhatsApp **Channel** URL, the channel invitation message and the optional direct-chat number |
 | `src/config/donation.js` | Bank account details, UPI IDs, payment QR verification state |
 | `src/config/media.js` | Paths to images supplied by the trust (QR codes, temple photo) |
 | `src/data/trustCommittee.js` | Trust committee roster and what is published |
 | `src/data/translations.js` | All Hindi / English / Gujarati strings |
 
-### WhatsApp group
+### WhatsApp Channel
 
-`WHATSAPP_GROUP_INVITE` in `src/config/constants.js` is the single source for the
-group invitation. Every "join the group" button renders through
-`src/components/WhatsAppButton.jsx`, so it always opens in a new tab with
+The temple retired its WhatsApp **group**. `WHATSAPP_CHANNEL_URL` in
+`src/config/constants.js` is now the only WhatsApp destination
+(`https://whatsapp.com/channel/0029VbDXHj74NVihUYAHIc1U`), and
+`WHATSAPP_CHANNEL_INVITATION` holds the trust's invitation message verbatim.
+
+Every WhatsApp button renders through `src/components/WhatsAppButton.jsx`; the
+invitation block and the "Follow Channel" button live in
+`src/components/WhatsAppChannelSection.jsx`. All links open in a new tab with
 `rel="noopener noreferrer"`.
 
 To re-enable direct 1-to-1 WhatsApp messages, put a real number in
 `WHATSAPP_DIRECT_NUMBER` (digits + country code, e.g. `919876543210`). While it
-is empty, direct-message buttons fall back to the group invitation.
+is empty, direct-message buttons fall back to the channel.
 
 ### Adding trust photographs
 
