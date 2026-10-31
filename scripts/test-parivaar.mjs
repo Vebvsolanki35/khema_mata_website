@@ -64,6 +64,7 @@ import {
 
 const ROOT = process.cwd();
 let passed = 0;
+let totalSuites = 0;
 
 /**
  * Suites are executed strictly one after another: several of them mutate the
@@ -73,6 +74,7 @@ let passed = 0;
 let suiteChain = Promise.resolve();
 
 function check(name, fn) {
+  totalSuites += 1;
   suiteChain = suiteChain.then(async () => {
     try {
       await fn();
@@ -1010,6 +1012,33 @@ check("8. [Production Bug 1 & Bug 2] Keyless Esri map provider without CARTO wat
       migrationSrc.includes("create or replace function public.get_public_parivaar_families"),
     "PostgreSQL migration must update submit_parivaar_registration with p_father_name, p_member_count, p_family_id, and village_family_id_counters"
   );
+
+  // 8c. The 2026-11-01 outage repair must exist, be non-destructive, and
+  //     re-publish the RPC to PostgREST (grants + schema-cache reload).
+  const repairSrc = fs.readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20261101090000_ensure_parivaar_rpc_available.sql"
+    ),
+    "utf8"
+  );
+  assert.ok(
+    repairSrc.includes("create or replace function public.submit_parivaar_registration") &&
+      repairSrc.includes("p_village_name") &&
+      repairSrc.includes("notify pgrst, 'reload schema'") &&
+      repairSrc.includes("grant execute on function public.submit_parivaar_registration"),
+    "Repair migration must recreate the RPC, grant EXECUTE and reload the PostgREST schema cache"
+  );
+  // Comments legitimately mention "no row is deleted"; only real SQL matters.
+  const repairSqlOnly = repairSrc
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join("\n");
+  assert.equal(
+    /\bdrop\s+table\b|\btruncate\b|\bdelete\s+from\b/i.test(repairSqlOnly),
+    false,
+    "The repair migration must never drop, truncate or delete registration data"
+  );
 });
 
 // 9. Chhapawda Data Consistency Regression Suite (Overview = Map = Directory across all hierarchy filters, Tehsil vs Block, Village-only, Search, & Multi-Location Consistency)
@@ -1352,6 +1381,28 @@ check("10. [Performance & Real-Time Sync] Server-side validation dry-run, idempo
       "Live registration data must never be cached"
     );
 
+    // 10d-2. The RPC health probe must be safe: it may report availability,
+    //        but it must never write a registration and never echo personal data.
+    const rowsBeforeProbe = db
+      .prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations")
+      .get().cnt;
+    const probeRes = await api("action=rpc-health");
+    const probeBody = await probeRes.json();
+    assert.ok(
+      probeRes.status === 200 || probeRes.status === 503,
+      "rpc-health must answer 200 (healthy) or 503 (not available)"
+    );
+    assert.equal(typeof probeBody.function_available, "boolean");
+    assert.ok(
+      !JSON.stringify(probeBody).includes("9812345670"),
+      "rpc-health must never include personal data"
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS cnt FROM parivaar_registrations").get().cnt,
+      rowsBeforeProbe,
+      "rpc-health must never create a registration"
+    );
+
     // 10e. Degraded mode: an unreachable database must produce a warning and
     //      must NOT be reported as "0 registrations".
     const previousUrl = process.env.SUPABASE_URL;
@@ -1370,6 +1421,15 @@ check("10. [Performance & Real-Time Sync] Server-side validation dry-run, idempo
       assert.ok(
         Number(degradedBody.stats.total_registrations) >= 3,
         "A database outage must never be converted into 0 registrations"
+      );
+
+      const degradedProbeRes = await api("action=rpc-health");
+      const degradedProbe = await degradedProbeRes.json();
+      assert.equal(degradedProbeRes.status, 503);
+      assert.equal(
+        degradedProbe.function_available,
+        false,
+        "An unreachable database must never be reported as a healthy RPC"
       );
     } finally {
       if (previousUrl === undefined) delete process.env.SUPABASE_URL;
@@ -1542,5 +1602,10 @@ check("11. [Durability] A failed database write never leaves a phantom family be
 await suiteChain;
 
 console.log("==============================================================");
-console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency + Performance/Real-Time Sync + Durability) passed!`);
+if (passed === totalSuites) {
+  console.log(`All ${passed} verification suites (covering all 16 scenarios + father_name + Production Bug 1 & Bug 2 + Chhapawda Consistency + Performance/Real-Time Sync + Durability) passed!`);
+} else {
+  console.log(`${passed} of ${totalSuites} verification suites passed - see the failures above.`);
+  process.exitCode = 1;
+}
 console.log("==============================================================");
