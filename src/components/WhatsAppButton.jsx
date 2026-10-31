@@ -1,5 +1,5 @@
 import {
-  WHATSAPP_GROUP_INVITE,
+  WHATSAPP_CHANNEL_URL,
   EXTERNAL_LINK_REL,
   WHATSAPP_GREEN,
 } from "../config/constants";
@@ -24,14 +24,14 @@ export function WhatsAppIcon({ size = 18, className = "" }) {
 }
 
 /**
- * Every "join the temple WhatsApp group" button on the site renders through here,
- * so the invitation URL and the security attributes are identical everywhere.
+ * Every WhatsApp call-to-action on the site renders through here, so the
+ * official channel URL and the security attributes are identical everywhere.
  *
  * The link always opens in a new tab with rel="noopener noreferrer".
  */
 function WhatsAppButton({
   children,
-  href = WHATSAPP_GROUP_INVITE,
+  href = WHATSAPP_CHANNEL_URL,
   showIcon = true,
   iconSize = 16,
   className = "",

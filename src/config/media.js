@@ -26,13 +26,6 @@ export const MEDIA = {
    */
   bankQr: "/assets/bank-payment-qr.png",
 
-  /**
-   * WhatsApp group QR cropped from the screenshot the trust supplied.
-   * Verified by decoding — it resolves to the same invitation as
-   * WHATSAPP_GROUP_INVITE.
-   */
-  whatsappGroupQr: "/assets/whatsapp-group-qr.png",
-
   /** Authentic temple entrance photograph supplied by the trust. */
   templeEntrance: "/assets/temple-entrance.jpg",
 };

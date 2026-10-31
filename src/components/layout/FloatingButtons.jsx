@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import WhatsAppButton, { WhatsAppIcon } from "../WhatsAppButton";
-import { WHATSAPP_GROUP_INVITE, WHATSAPP_GREEN } from "../../config/constants";
+import { WHATSAPP_CHANNEL_URL, WHATSAPP_GREEN } from "../../config/constants";
 import { useLanguage } from "../../context/useLanguage";
 
 /**
@@ -32,11 +32,11 @@ function FloatingButtons() {
       </Link>
 
       <WhatsAppButton
-        href={WHATSAPP_GROUP_INVITE}
+        href={WHATSAPP_CHANNEL_URL}
         className="float-btn float-whatsapp"
         style={{ backgroundColor: WHATSAPP_GREEN, color: "#FFFFFF" }}
         showIcon={false}
-        ariaLabel={t.whatsappGroup?.button || "WhatsApp"}
+        ariaLabel={t.whatsappGroup?.button || "Follow Channel"}
       >
         <WhatsAppIcon size={18} />
         <span>WhatsApp</span>

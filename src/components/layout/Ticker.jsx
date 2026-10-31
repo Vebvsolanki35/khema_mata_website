@@ -1,10 +1,10 @@
 /**
  * Scrolling announcement bar.
  *
- * Deliberately limited to timeless essentials: no darshan timings (they live on
- * the dedicated Darshan & Aarti page) and no dated festival announcements that
- * would silently go stale. There is no placeholder phone number here — the
- * WhatsApp entry points at the official group invitation.
+ * Deliberately limited to timeless essentials: no darshan timings (the home
+ * page publishes them) and no dated festival announcements that would silently
+ * go stale. There is no placeholder phone number here — the WhatsApp entry
+ * points at the official channel.
  */
 function Ticker() {
   const updates = [
@@ -12,7 +12,7 @@ function Ticker() {
     "🕌 देई, बूंदी, राजस्थान ३२३८०२",
     "🌟 निःशुल्क दर्शन | Free Entry",
     "💸 बैंक दान: ICICI Bank • खाता 686005601933 • IFSC ICIC0006860",
-    "💬 मंदिर अपडेट के लिए WhatsApp ग्रुप से जुड़ें",
+    "💬 मंदिर अपडेट के लिए आधिकारिक WhatsApp चैनल फॉलो करें",
   ];
 
   const tickerText = updates.join("   •   ");

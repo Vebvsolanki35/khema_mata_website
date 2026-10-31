@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useLanguage } from "../context/useLanguage";
-import { WHATSAPP_GROUP_INVITE, HAS_DIRECT_WHATSAPP, whatsAppDirectUrl } from "../config/constants";
+import { WHATSAPP_CHANNEL_URL, HAS_DIRECT_WHATSAPP, whatsAppDirectUrl } from "../config/constants";
 import { UPI_IDS } from "../config/donation";
 import BankDetailsCard from "../components/BankDetailsCard";
 import PaymentQrCard from "../components/PaymentQrCard";
@@ -69,7 +69,7 @@ function Donation() {
           <BankDetailsCard />
         </section>
 
-        {/* Payment QR — separate from the WhatsApp group QR */}
+        {/* Payment QR — the only QR on this page */}
         <section className="text-center">
           <PaymentQrCard />
         </section>
@@ -216,7 +216,7 @@ function Donation() {
                 href={
                   HAS_DIRECT_WHATSAPP
                     ? whatsAppDirectUrl(donationMessage(selectedAmt, d))
-                    : WHATSAPP_GROUP_INVITE
+                    : WHATSAPP_CHANNEL_URL
                 }
                 iconSize={18}
                 className="flex-1 px-6 py-3 rounded-full text-sm sm:text-base"
@@ -227,7 +227,7 @@ function Donation() {
           </div>
         </section>
 
-        {/* WhatsApp contact */}
+        {/* Official WhatsApp Channel */}
         <section
           className="p-6 rounded-2xl text-center"
           style={{ backgroundColor: "var(--maroon)", border: "1px solid var(--gold)" }}
@@ -242,7 +242,7 @@ function Donation() {
             {d.whatsappDesc}
           </p>
           <WhatsAppButton
-            href={WHATSAPP_GROUP_INVITE}
+            href={WHATSAPP_CHANNEL_URL}
             iconSize={18}
             className="px-8 py-3 rounded-full text-base"
           >

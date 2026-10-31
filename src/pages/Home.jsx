@@ -5,7 +5,7 @@ import { EXTERNAL_LINK_REL } from "../config/constants";
 
 /**
  * Quick action: one large, obvious tap target with a short label.
- * `href` is used for external destinations (WhatsApp), `to` for in-app routes.
+ * `href` is used for external destinations (WhatsApp channel), `to` for routes.
  */
 function QuickAction({ item }) {
   const content = (
@@ -64,23 +64,47 @@ function QuickAction({ item }) {
   );
 }
 
+/** One compact timing row: label on the left, time on the right. */
+function TimingRow({ label, time }) {
+  return (
+    <li className="flex items-baseline justify-between gap-2 text-sm">
+      <span className="font-semibold" style={{ color: "#4A3728" }}>
+        {label}
+      </span>
+      <span
+        className="font-bold text-right"
+        style={{ color: "var(--saffron)" }}
+      >
+        {time}
+      </span>
+    </li>
+  );
+}
+
 /**
- * Home — intentionally short.
+ * Home — the whole site in one phone screen of scrolling.
  *
- * A devotee on a phone sees, in order:
  *   1. temple name, location and one hero photograph
- *   2. four clear actions: darshan timings · Parivaar · donate · WhatsApp
- *   3. important notices (when the trust has published any)
- *   4. a short temple introduction with a link to the heritage page
+ *   2. the darshan + aarti timings (the only place they are published)
+ *   3. three clear actions: Parivaar · donate · WhatsApp channel
+ *   4. important notices (only when the trust has published any)
+ *   5. a short temple introduction with a link to the heritage page
  *
- * Everything else (aarti schedule, history, facilities, gallery, donation
- * details, trust committee, contact) lives on its own page. No repeated card
- * grids, no statistics band, no duplicate donation blocks.
+ * The separate Darshan & Aarti page was removed: the timings below are the
+ * single source, taken from the same translation data (`t.darshan.*`,
+ * `t.temple.aartis`) the trust already edits — no timing was invented here.
  */
 function Home() {
   const { t } = useLanguage();
   const ui = t.mobileUi || {};
   const actions = ui.quickActions || [];
+  const d = t.darshanPage;
+
+  const darshanTimings = [
+    { icon: "🌅", label: t.darshan.morning, time: t.darshan.morningTime },
+    { icon: "🌇", label: t.darshan.evening, time: t.darshan.eveningTime },
+    { icon: "🎉", label: t.darshan.navratri, time: t.darshan.navratriTime },
+  ];
 
   return (
     <main>
@@ -114,8 +138,8 @@ function Home() {
           <p className="text-xs sm:text-sm opacity-90" style={{ color: "#FFF8F0" }}>
             {t.hero.location || "देई, बूंदी, राजस्थान"}
           </p>
-          <Link
-            to="/darshan"
+          <a
+            href="#darshan-timings"
             className="inline-flex items-center justify-center gap-2 rounded-full font-bold text-sm sm:text-base mt-5"
             style={{
               minHeight: "48px",
@@ -127,11 +151,79 @@ function Home() {
           >
             <span aria-hidden="true">🕉️</span>
             {ui.darshanLink || t.nav.darshanTab}
-          </Link>
+          </a>
         </div>
       </section>
 
-      {/* Four primary actions */}
+      {/* Darshan + aarti timings — compact, right under the hero on a phone */}
+      <section
+        id="darshan-timings"
+        className="px-3.5 sm:px-4 py-5 sm:py-7 scroll-mt-16"
+        style={{ backgroundColor: "#FFFBF2" }}
+        aria-labelledby="darshan-timings-title"
+      >
+        <div className="max-w-4xl mx-auto">
+          <h2
+            id="darshan-timings-title"
+            className="text-lg sm:text-xl font-bold text-center mb-3"
+            style={{
+              color: "var(--maroon)",
+              fontFamily: "'Tiro Devanagari Hindi', serif",
+            }}
+          >
+            🔔 {d.title}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              className="rounded-2xl bg-white p-3.5 sm:p-4"
+              style={{ border: "1.5px solid rgba(212,175,55,0.7)" }}
+            >
+              <h3
+                className="text-sm font-bold mb-2"
+                style={{ color: "var(--maroon)" }}
+              >
+                ⏰ {d.timingsTitle}
+              </h3>
+              <ul className="space-y-2" data-testid="darshan-timings">
+                {darshanTimings.map((item) => (
+                  <TimingRow
+                    key={item.label}
+                    label={`${item.icon} ${item.label}`}
+                    time={item.time}
+                  />
+                ))}
+              </ul>
+            </div>
+
+            <div
+              className="rounded-2xl bg-white p-3.5 sm:p-4"
+              style={{ border: "1.5px solid rgba(212,175,55,0.7)" }}
+            >
+              <h3
+                className="text-sm font-bold mb-2"
+                style={{ color: "var(--maroon)" }}
+              >
+                🪔 {d.aartiTitle}
+              </h3>
+              <ul className="space-y-2" data-testid="darshan-aarti-list">
+                {t.temple.aartis.map((a) => (
+                  <TimingRow key={a.name} label={a.name} time={a.time} />
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p
+            className="mt-2.5 text-center text-[11px] sm:text-xs leading-relaxed"
+            style={{ color: "#6B5B4B" }}
+          >
+            {d.timingsNote}
+          </p>
+        </div>
+      </section>
+
+      {/* Primary actions */}
       <section
         className="px-3.5 sm:px-4 py-5 sm:py-7"
         style={{ backgroundColor: "var(--cream)" }}
@@ -151,7 +243,7 @@ function Home() {
             </p>
           )}
           <div
-            className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3"
             data-testid="home-quick-actions"
           >
             {actions.map((item) => (

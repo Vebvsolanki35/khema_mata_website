@@ -1,21 +1,22 @@
 /**
- * The five public navigation sections.
+ * The four public navigation sections.
  *
- * Exactly five destinations, shown identically in the desktop header, the fixed
+ * Exactly four destinations, shown identically in the desktop header, the fixed
  * mobile bottom bar and the footer:
  *
- *   1. मुख्य पृष्ठ            → /
- *   2. मंदिर एवं विरासत        → /temple  (+ /history, /facilities, /gallery)
- *   3. दर्शन एवं आरती          → /darshan
- *   4. सोलंकी परिवार          → /parivaar
- *   5. ट्रस्ट एवं सेवा         → /donation (+ /trust, /contact)
+ *   1. मुख्य पृष्ठ            → /        (darshan + aarti timings live here)
+ *   2. मंदिर एवं विरासत        → /temple  (+ /history, /gallery)
+ *   3. सोलंकी परिवार          → /parivaar
+ *   4. ट्रस्ट एवं सेवा         → /donation (+ /trust, /contact)
  *
  * Removed from the public site (see docs/MOBILE_UX.md):
- *   /visit, /planner  — Yatra planning
- *   /calendar         — Panchang / festival (Tyohar) calendar
+ *   /visit, /planner   — Yatra planning
+ *   /calendar          — Panchang / festival (Tyohar) calendar
+ *   /darshan           — separate Darshan & Aarti page; the timings are on Home
+ *   /facilities        — "Helpful services" card grid
  *
  * Sub-pages remain reachable from their section page and from the footer; they
- * are not extra primary tabs, so the five tabs stay easy to scan on a phone.
+ * are not extra primary tabs, so the tabs stay easy to scan on a phone.
  */
 export const SECTIONS = [
   {
@@ -35,17 +36,8 @@ export const SECTIONS = [
     children: [
       { to: "/temple", labelKey: "temple", icon: "🛕" },
       { to: "/history", labelKey: "history", icon: "👑" },
-      { to: "/facilities", labelKey: "facilities", icon: "⭐" },
       { to: "/gallery", labelKey: "gallery", icon: "📷" },
     ],
-  },
-  {
-    id: "darshan",
-    to: "/darshan",
-    labelKey: "darshanTab",
-    shortKey: "darshanShort",
-    icon: "🔔",
-    children: [{ to: "/darshan", labelKey: "darshanTab", icon: "🔔" }],
   },
   {
     id: "parivaar",
@@ -70,7 +62,7 @@ export const SECTIONS = [
 ];
 
 /**
- * The five fixed bottom tabs — derived from `SECTIONS` so there is exactly one
+ * The fixed bottom tabs — derived from `SECTIONS` so there is exactly one
  * navigation source of truth and no possibility of the two drifting apart.
  */
 export const BOTTOM_TABS = SECTIONS.map((section) => ({

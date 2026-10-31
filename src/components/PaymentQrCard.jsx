@@ -6,7 +6,8 @@ import { MEDIA } from "../config/media";
  * The QR printed on the bank card supplied by the trust.
  *
  * IMPORTANT — this is the PAYMENT / BANK QR. It is intentionally a separate
- * component from <WhatsAppGroupSection /> so the two QR codes are never mixed up.
+ * component from <WhatsAppChannelSection /> so the payment QR is never confused
+ * with any other QR the site may show.
  *
  * The QR has NOT been decoded. It is therefore not described as a UPI QR, no
  * UPI ID is derived from it, and no claim is made that scanning it completes a

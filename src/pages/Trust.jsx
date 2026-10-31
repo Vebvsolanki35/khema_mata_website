@@ -1,6 +1,6 @@
 import { useLanguage } from "../context/useLanguage";
 import TrustCommittee from "../components/TrustCommittee";
-import WhatsAppGroupSection from "../components/WhatsAppGroupSection";
+import WhatsAppChannelSection from "../components/WhatsAppChannelSection";
 
 /**
  * Dedicated Trust Committee page.
@@ -33,7 +33,7 @@ function Trust() {
 
       <TrustCommittee />
 
-      <WhatsAppGroupSection />
+      <WhatsAppChannelSection />
     </main>
   );
 }

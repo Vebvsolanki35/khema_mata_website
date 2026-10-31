@@ -13,9 +13,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const Temple = lazy(() => import("./pages/Temple"));
 const History = lazy(() => import("./pages/History"));
 const Donation = lazy(() => import("./pages/Donation"));
-const Facilities = lazy(() => import("./pages/Facilities"));
 const Gallery = lazy(() => import("./pages/Gallery"));
-const Darshan = lazy(() => import("./pages/Darshan"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Trust = lazy(() => import("./pages/Trust"));
@@ -145,9 +143,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/temple" element={<Temple />} />
             <Route path="/history" element={<History />} />
-            <Route path="/darshan" element={<Darshan />} />
             <Route path="/donation" element={<Donation />} />
-            <Route path="/facilities" element={<Facilities />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/trust" element={<Trust />} />
             <Route path="/contact" element={<Contact />} />

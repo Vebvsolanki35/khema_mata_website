@@ -9,7 +9,6 @@ no broken images appear on the site.
 | File | Config key | Source | Status |
 |---|---|---|---|
 | `bank-payment-qr.png` | `bankQr` | Cropped from the ICICI Bank card | ✅ QR decoded & verified as a UPI payment QR |
-| `whatsapp-group-qr.png` | `whatsappGroupQr` | Cropped from the WhatsApp group QR screenshot | ✅ QR decoded — matches `WHATSAPP_GROUP_INVITE` |
 | `temple-entrance.jpg` | `templeEntrance` | Original temple entrance photograph | ✅ Original photo, resized only |
 | `bank-card-full.jpg` | *(not referenced)* | Full rotated ICICI card | Available if you'd rather show the whole card |
 
@@ -21,7 +20,6 @@ being published:
 - **Bank card** — rotated 90° counter-clockwise (the QR's finder-pattern
   geometry confirmed the correct direction), then cropped to the QR symbol plus
   a quiet zone.
-- **WhatsApp group QR** — already upright; cropped to the QR plus a quiet zone.
 - **Temple photograph** — already upright (verified: dark, low-texture sky band
   across the top, warm stone below; dominant lines within 2.5° of horizontal).
   Resized to 1600px wide only. **Not** re-shot, restyled or replaced.
@@ -44,6 +42,8 @@ which is gitignored so it is never committed or served.
 
 - Use the **original** files. Never regenerate, upscale, or replace the temple
   photograph with stock or AI imagery.
-- The bank QR and the WhatsApp group QR are **different QR codes** and render in
-  different sections — do not swap them.
+- The temple no longer runs a WhatsApp *group*; the retired group QR
+  (`whatsapp-group-qr.png`) is intentionally removed from this folder and from
+  `src/config/media.js`. Promotions now use the official WhatsApp **Channel**
+  link in `src/config/constants.js` only.
 - Crop / rotate freely, but never redraw or "clean up" a QR.

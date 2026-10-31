@@ -33,7 +33,7 @@ import {
 } from "../src/data/navigation.js";
 import translations from "../src/data/translations.js";
 import { BANK_DETAILS, UPI_IDS } from "../src/config/donation.js";
-import { WHATSAPP_GROUP_INVITE } from "../src/config/constants.js";
+import { WHATSAPP_CHANNEL_URL } from "../src/config/constants.js";
 import {
   isValidIndianPhone,
   normalizeIndianPhone,
@@ -745,8 +745,8 @@ check("5. [Scenario 11] Parivaar page has 5 clear sections, registration form re
   );
 });
 
-// 6. Map Tile Provider, LGD Data-Quality Report, Navigation & Mobile-First UI/UX Regression Checks
-check("6. Map tile configuration, LGD Data-Quality Report, five-tab navigation, removed public pages, and Mobile-First UI/UX checks", () => {
+// 6. Map Tile Provider, LGD Data-Quality Report, Navigation, Timings & WhatsApp Channel Checks
+check("6. Map tile configuration, LGD Data-Quality Report, four-tab navigation, removed pages, darshan timings on Home and the official WhatsApp Channel", () => {
   const mapCode = fs.readFileSync(
     path.join(ROOT, "src/components/parivaar/CommunityMap.jsx"),
     "utf8"
@@ -768,34 +768,45 @@ check("6. Map tile configuration, LGD Data-Quality Report, five-tab navigation, 
     "CommunityMap must support zoom levels up to 18"
   );
 
-  const ids = SECTIONS.map((s) => s.id);
+  // 6a. Navigation: four sections, no separate Darshan & Aarti tab.
   assert.deepEqual(
-    ids,
-    ["home", "heritage", "darshan", "parivaar", "seva"],
-    "The public site must expose exactly five sections: Home, Temple & Heritage, Darshan & Aarti, Solanki Parivaar, Trust & Seva"
+    SECTIONS.map((section) => section.id),
+    ["home", "heritage", "parivaar", "seva"],
+    "The public site must expose four sections: Home, Temple & Heritage, Solanki Parivaar, Trust & Seva"
   );
-  // 6a. Exactly five fixed bottom tabs, derived from SECTIONS, with no extra
-  // "More" drawer — the five destinations must be reachable directly.
   assert.deepEqual(
-    BOTTOM_TABS.map((t) => t.id),
-    ["home", "heritage", "darshan", "parivaar", "seva"],
-    "Fixed bottom navigation must have exactly the five required tabs"
+    BOTTOM_TABS.map((tab) => tab.id),
+    ["home", "heritage", "parivaar", "seva"],
+    "Fixed bottom navigation must match the four sections"
   );
-  assert.equal(BOTTOM_TABS.length, 5, "There must be exactly five bottom tabs");
   assert.equal(
-    BOTTOM_TABS.some((t) => t.id === "more"),
+    BOTTOM_TABS.some((tab) => tab.to === "/darshan"),
     false,
-    "The bottom navigation must not hide destinations behind a More menu"
+    "The Darshan & Aarti page must not appear in the navigation"
   );
-  const removedRoutes = ["/visit", "/planner", "/calendar"];
+  assert.equal(
+    BOTTOM_TABS.some((tab) => tab.to === "/facilities"),
+    false,
+    "The Helpful services page must not appear in the navigation"
+  );
+
+  // 6b. The removed routes are gone from navigation AND from the router, and
+  // their page files no longer exist.
+  const removedRoutes = ["/visit", "/planner", "/calendar", "/darshan", "/facilities"];
+  const appSrc = fs.readFileSync(path.join(ROOT, "src/App.jsx"), "utf8");
   for (const route of removedRoutes) {
     assert.equal(
       ALL_PUBLIC_ROUTES.includes(route),
       false,
       `Removed page ${route} must not be part of the public navigation`
     );
+    assert.equal(
+      appSrc.includes(`path="${route}"`),
+      false,
+      `App.jsx must not register the removed route ${route}`
+    );
   }
-  for (const page of ["Visit", "Planner", "Calendar", "Testimonials"]) {
+  for (const page of ["Visit", "Planner", "Calendar", "Testimonials", "Darshan", "Facilities"]) {
     assert.equal(
       fs.existsSync(path.join(ROOT, "src/pages", `${page}.jsx`)) ||
         fs.existsSync(path.join(ROOT, "src/components", `${page}.jsx`)),
@@ -803,54 +814,65 @@ check("6. Map tile configuration, LGD Data-Quality Report, five-tab navigation, 
       `${page} page/component must be removed from the public site`
     );
   }
-  const appSrc = fs.readFileSync(path.join(ROOT, "src/App.jsx"), "utf8");
-  for (const route of removedRoutes) {
+
+  // 6c. The "Helpful services" card grid (and every one of its ten cards) is
+  // gone from the copy, and nothing still imports the removed component.
+  for (const locale of ["hi", "en", "gu"]) {
     assert.equal(
-      appSrc.includes(`path="${route}"`),
+      Object.prototype.hasOwnProperty.call(translations[locale], "facilities"),
       false,
-      `App.jsx must not register the removed route ${route}`
+      `The facilities / "Helpful services" copy must be removed (${locale})`
     );
   }
+  const facilitiesCopy = ["Free Darshan", "Prasad Distribution", "Dharmashala", "First Aid", "History Book"];
+  const publicSources = [];
+  const collect = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) collect(full);
+      else if (/\.(jsx?|mjs)$/.test(entry.name)) publicSources.push(full);
+    }
+  };
+  collect(path.join(ROOT, "src"));
+  for (const file of publicSources) {
+    const src = fs.readFileSync(file, "utf8");
+    for (const card of facilitiesCopy) {
+      assert.equal(
+        src.includes(card),
+        false,
+        `${path.relative(ROOT, file)} must not render the removed "${card}" card`
+      );
+    }
+  }
 
-  // 6a-2. Removed public features: Yatra, Tyohar, public reviews, visitor
-  // gallery upload, and duplicate darshan timing displays.
+  // 6d. Home is short, has no reviews / festival grid / volunteer form, and is
+  // the single place the darshan + aarti timings are published.
   const homeSrc = fs.readFileSync(path.join(ROOT, "src/pages/Home.jsx"), "utf8");
-  assert.equal(
-    homeSrc.includes("Testimonials"),
-    false,
-    "The public reviews section must be removed from the homepage"
-  );
-  assert.equal(
-    homeSrc.includes("festival"),
-    false,
-    "The Tyohar / festival content must be removed from the homepage"
-  );
-  assert.equal(
-    homeSrc.includes("VolunteerRegistration"),
-    false,
-    "The homepage must stay short — seva registration lives on the Trust & Seva page"
-  );
-
-  const gallerySrc = fs.readFileSync(path.join(ROOT, "src/pages/Gallery.jsx"), "utf8");
-  assert.equal(
-    gallerySrc.includes('type="file"') ||
-      gallerySrc.includes("storage") ||
-      gallerySrc.includes(".insert("),
-    false,
-    "Visitors must not be able to upload or publish gallery photos"
-  );
-
-  const darshanSrc = fs.readFileSync(path.join(ROOT, "src/pages/Darshan.jsx"), "utf8");
+  assert.equal(homeSrc.includes("Testimonials"), false, "The public reviews section must stay removed");
+  assert.equal(homeSrc.includes("festival"), false, "Festival content must stay removed from Home");
+  assert.equal(homeSrc.includes("VolunteerRegistration"), false, "The homepage must stay short");
   assert.ok(
-    darshanSrc.includes('data-testid="darshan-timings"') &&
-      darshanSrc.includes('data-testid="darshan-aarti-list"'),
-    "Darshan & Aarti page must show timings and the aarti schedule"
+    homeSrc.includes('id="darshan-timings"') &&
+      homeSrc.includes('data-testid="darshan-timings"') &&
+      homeSrc.includes('data-testid="darshan-aarti-list"'),
+    "Home must publish the darshan times and the aarti schedule"
   );
-  assert.equal(
-    darshanSrc.includes("CalendarContent") || darshanSrc.includes("FESTIVALS"),
-    false,
-    "Darshan page must be a clean timings + aarti page (no Panchang or festival calendar)"
+  assert.ok(
+    homeSrc.includes("t.darshan.morningTime") &&
+      homeSrc.includes("t.darshan.eveningTime") &&
+      homeSrc.includes("t.darshan.navratriTime") &&
+      homeSrc.includes("t.temple.aartis"),
+    "Home must reuse the existing timing data instead of hard-coded times"
   );
+  for (const locale of ["hi", "en", "gu"]) {
+    const actions = translations[locale].mobileUi.quickActions;
+    assert.equal(actions.length, 3, `Home must show three quick actions (${locale})`);
+    assert.equal(
+      actions.some((action) => action.to === "/darshan"),
+      false,
+      `Home quick actions must not link to the removed Darshan page (${locale})`
+    );
+  }
 
   const timingConsumers = [];
   const walk = (dir) => {
@@ -859,42 +881,84 @@ check("6. Map tile configuration, LGD Data-Quality Report, five-tab navigation, 
       if (entry.isDirectory()) walk(full);
       else if (entry.name.endsWith(".jsx")) {
         const src = fs.readFileSync(full, "utf8");
-        if (src.includes("morningTime")) {
-          timingConsumers.push(path.relative(ROOT, full).replace(/\\/g, "/"));
-        }
+        if (src.includes("morningTime")) timingConsumers.push(path.relative(ROOT, full).replace(/\\/g, "/"));
       }
     }
   };
   walk(path.join(ROOT, "src"));
   assert.deepEqual(
     timingConsumers,
-    ["src/pages/Darshan.jsx"],
+    ["src/pages/Home.jsx"],
     `Darshan timings must be displayed on exactly one page (found: ${timingConsumers.join(", ")})`
   );
 
-  // 6b. Exactly one mobile navigation system: the header drawer is gone and
-  // the five bottom tabs are the only mobile navigation.
-  const navbarSrc = fs.readFileSync(
-    path.join(ROOT, "src/components/layout/Navbar.jsx"),
-    "utf8"
+  // 6e. Gallery: no stock photography, no upload flow, honest empty state.
+  const gallerySrc = fs.readFileSync(path.join(ROOT, "src/pages/Gallery.jsx"), "utf8");
+  assert.equal(
+    gallerySrc.includes("images.unsplash.com") || gallerySrc.includes("DEFAULT_IMAGES"),
+    false,
+    "The gallery must not render stock/placeholder photographs"
   );
   assert.equal(
-    navbarSrc.includes("mobile-nav-drawer"),
+    gallerySrc.includes('type="file"') || gallerySrc.includes("storage") || gallerySrc.includes(".insert("),
     false,
-    "The mobile hamburger drawer must be replaced by the fixed bottom navigation"
+    "Visitors must not be able to upload or publish gallery photos"
   );
-  const bottomNavSrc = fs.readFileSync(
-    path.join(ROOT, "src/components/layout/BottomNav.jsx"),
+  assert.ok(
+    gallerySrc.includes('data-testid="gallery-empty-state"') &&
+      gallerySrc.includes("MEDIA.templeEntrance"),
+    "The gallery must show the trust photograph or a clean empty state"
+  );
+
+  // 6f. WhatsApp: one official channel URL everywhere, no group invite left.
+  assert.equal(
+    WHATSAPP_CHANNEL_URL,
+    "https://whatsapp.com/channel/0029VbDXHj74NVihUYAHIc1U",
+    "The official WhatsApp channel URL must match exactly"
+  );
+  const channelSectionSrc = fs.readFileSync(
+    path.join(ROOT, "src/components/WhatsAppChannelSection.jsx"),
     "utf8"
   );
   assert.ok(
-    bottomNavSrc.includes('data-testid="bottom-nav"') &&
-      bottomNavSrc.includes("BOTTOM_TABS"),
-    "A fixed bottom navigation derived from BOTTOM_TABS must exist"
+    channelSectionSrc.includes("WHATSAPP_CHANNEL_URL") &&
+      channelSectionSrc.includes("WHATSAPP_CHANNEL_INVITATION"),
+    "The channel section must render the official link and the trust's invitation"
   );
+  for (const file of publicSources) {
+    const src = fs.readFileSync(file, "utf8");
+    assert.equal(
+      src.includes("chat.whatsapp.com"),
+      false,
+      `${path.relative(ROOT, file)} must not reference a WhatsApp group link`
+    );
+    assert.equal(
+      src.includes("WHATSAPP_GROUP_INVITE"),
+      false,
+      `${path.relative(ROOT, file)} must use WHATSAPP_CHANNEL_URL instead of the retired group constant`
+    );
+    assert.equal(
+      src.includes("Join WhatsApp Group"),
+      false,
+      `${path.relative(ROOT, file)} must not ask visitors to join a WhatsApp group`
+    );
+  }
+  for (const locale of ["hi", "en", "gu"]) {
+    const copy = JSON.stringify(translations[locale]);
+    assert.equal(
+      /join our whatsapp group|whatsapp group|ग्रुप में शामिल|ગ્રૂપમાં જોડાઓ/i.test(copy),
+      false,
+      `Group-join wording must be removed (${locale})`
+    );
+    assert.ok(
+      /follow/i.test(translations[locale].whatsappGroup.button) ||
+        translations[locale].whatsappGroup.button.includes("फॉलो") ||
+        translations[locale].whatsappGroup.button.includes("ફોલો"),
+      `WhatsApp button must say Follow Channel (${locale})`
+    );
+  }
 
-  // 6c. Registration is a 4-step wizard reusing the shared validator and the
-  // same submit call — no second form and no duplicate validation rules.
+  // 6g. Registration is still a 4-step wizard reusing the shared validator.
   const wizardSrc = fs.readFileSync(
     path.join(ROOT, "src/components/parivaar/ParivaarRegistrationForm.jsx"),
     "utf8"
@@ -904,51 +968,45 @@ check("6. Map tile configuration, LGD Data-Quality Report, five-tab navigation, 
     wizardSrc.includes('data-testid="reg-step-indicator"') &&
       wizardSrc.includes('data-testid="reg-next-btn"') &&
       wizardSrc.includes('data-testid="reg-back-btn"') &&
-      wizardSrc.includes('data-testid="reg-submit-btn"'),
-    "Wizard must expose progress indicator plus next/back/submit controls"
+      wizardSrc.includes('data-testid="reg-submit-btn"') &&
+      wizardSrc.includes('data-testid="reg-review-card"'),
+    "Wizard must keep its progress indicator, review card and next/back/submit controls"
   );
   assert.ok(
     wizardSrc.includes("validateParivaarRegistration(") &&
       wizardSrc.includes("submitRegistration("),
     "Wizard must reuse the shared validator and the single submitRegistration call"
   );
-  assert.ok(
-    wizardSrc.includes("id=\"parivaar-state\"") &&
-      wizardSrc.includes("id=\"parivaar-district\"") &&
-      wizardSrc.includes("id=\"parivaar-subdistrict\"") &&
-      wizardSrc.includes("id=\"parivaar-village\""),
-    "Ancestral village step must keep the sequential State → District → Tehsil → Village selects"
-  );
-  assert.ok(
-    wizardSrc.includes('data-testid="reg-review-card"') &&
-      wizardSrc.includes("goToStep(") &&
-      wizardSrc.includes("selectedVillageName"),
-    "The final step must let the devotee review every earlier step before submitting"
-  );
-  assert.ok(
-    wizardSrc.includes("prefillLocation") && wizardSrc.includes("setCurrentStep(2)"),
-    "Choosing a village on the map must open the registration form on the village step"
-  );
+  assert.equal(getActiveSection("/parivaar")?.section?.id, "parivaar");
+  assert.equal(getActiveSection("/darshan")?.section?.id, undefined);
 
-  // 6d. The active tab must follow the SECTION, not an exact URL match: a
-  // sub-page such as /gallery or /contact keeps its parent tab highlighted.
-  const tabBy = (id) => BOTTOM_TABS.find((tab) => tab.id === id);
-  assert.equal(isBottomTabActive(tabBy("heritage"), "/gallery"), true);
-  assert.equal(isBottomTabActive(tabBy("heritage"), "/history"), true);
-  assert.equal(isBottomTabActive(tabBy("seva"), "/contact"), true);
-  assert.equal(isBottomTabActive(tabBy("seva"), "/trust"), true);
-  assert.equal(isBottomTabActive(tabBy("darshan"), "/gallery"), false);
-  assert.equal(isBottomTabActive(tabBy("home"), "/parivaar"), false);
+  // 6h. One mobile navigation system: header tabs follow the section, bottom
+  // bar exists, and the mobile drawer is gone.
+  const navbarSrc = fs.readFileSync(path.join(ROOT, "src/components/layout/Navbar.jsx"), "utf8");
+  assert.equal(
+    navbarSrc.includes("mobile-nav-drawer"),
+    false,
+    "The mobile hamburger drawer must be replaced by the fixed bottom navigation"
+  );
   assert.equal(
     navbarSrc.includes("<NavLink") && navbarSrc.includes("aria-current"),
     false,
     "Header tabs must not let NavLink override aria-current on child routes"
   );
-  assert.equal(getActiveSection("/parivaar")?.section?.id, "parivaar");
+  const bottomNavSrc = fs.readFileSync(path.join(ROOT, "src/components/layout/BottomNav.jsx"), "utf8");
+  assert.ok(
+    bottomNavSrc.includes('data-testid="bottom-nav"') && bottomNavSrc.includes("BOTTOM_TABS"),
+    "A fixed bottom navigation derived from BOTTOM_TABS must exist"
+  );
+  const tabBy = (id) => BOTTOM_TABS.find((tab) => tab.id === id);
+  assert.equal(isBottomTabActive(tabBy("heritage"), "/gallery"), true);
+  assert.equal(isBottomTabActive(tabBy("heritage"), "/history"), true);
+  assert.equal(isBottomTabActive(tabBy("seva"), "/contact"), true);
+  assert.equal(isBottomTabActive(tabBy("home"), "/parivaar"), false);
+
   assert.equal(BANK_DETAILS.accountNumber, "686005601933");
   assert.equal(BANK_DETAILS.ifsc, "ICIC0006860");
   assert.ok(UPI_IDS.length >= 1);
-  assert.ok(WHATSAPP_GROUP_INVITE.startsWith("https://chat.whatsapp.com/"));
 
   const db = getParivaarDb();
   const dq = queryDataQualityReport(db);

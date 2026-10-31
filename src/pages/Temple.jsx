@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useLanguage } from "../context/useLanguage";
 import { HistoryContent } from "./History";
-import { FacilitiesContent } from "./Facilities";
 import { GalleryContent } from "./Gallery";
 
 /**
@@ -11,14 +10,11 @@ import { GalleryContent } from "./Gallery";
  *   1. temple introduction and information
  *   2. temple history
  *   3. Solanki dynasty history and heritage  (<HistoryContent/>)
- *   4. temple facilities and visitor information (<FacilitiesContent/>)
- *   5. photo gallery (display-only, incl. the authentic trust photograph)
+ *   4. photo gallery (verified photographs only)
  *
- * Darshan and aarti timings are NOT repeated here — they live only on
- * /darshan, linked from the card below the information table. There is no
- * secondary tab bar: each former sub-page contributes its real component,
- * rendered inline, and /history, /facilities and /gallery still render the
- * very same components standalone.
+ * Darshan and aarti timings are NOT repeated here — they are published once on
+ * the home page, linked from the card below the information table. The former
+ * "Helpful services" card grid (/facilities) has been removed entirely.
  */
 function Temple() {
   const { t } = useLanguage();
@@ -72,11 +68,11 @@ function Temple() {
 
       <div className="gold-divider mx-8" />
 
-      {/* Single link to the one page that shows darshan and aarti timings */}
+      {/* Single link to the one place that shows darshan and aarti timings */}
       <section className="pb-8 px-4 bg-white">
         <div className="max-w-3xl mx-auto">
           <Link
-            to="/darshan"
+            to="/#darshan-timings"
             className="flex items-center justify-between gap-3 rounded-2xl px-4 py-4"
             style={{
               backgroundColor: "var(--cream)",
@@ -97,7 +93,7 @@ function Temple() {
                   {t.nav.darshanTab}
                 </span>
                 <span className="block text-[11px] sm:text-xs" style={{ color: "#6B5B4B" }}>
-                  दर्शन एवं आरती का समय देखें
+                  मुख्य पृष्ठ पर दर्शन एवं आरती का समय देखें
                 </span>
               </span>
             </span>
@@ -137,10 +133,7 @@ function Temple() {
       {/* 3 — Solanki dynasty history and heritage (from /history) */}
       <HistoryContent />
 
-      {/* 4 — Temple facilities and visitor information (from /facilities) */}
-      <FacilitiesContent showAarti={false} />
-
-      {/* 5 — Photo gallery, incl. the authentic temple photograph (from /gallery) */}
+      {/* 4 — Photo gallery: verified photographs only (from /gallery) */}
       <GalleryContent />
 
     </main>
