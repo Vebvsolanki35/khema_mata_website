@@ -2512,9 +2512,31 @@ export function applyPostgresRegistrationToReplica(
       ? null
       : db
           .prepare(
-            "SELECT id FROM parivaar_registrations WHERE family_id = ? LIMIT 1"
+            "SELECT id, full_name, phone_number FROM parivaar_registrations WHERE family_id = ? LIMIT 1"
           )
           .get(row.family_id);
+
+    // A Family ID issued by the database must never overwrite a *different*
+    // family.  This can only happen when the authoritative counter is behind the
+    // families already published here (e.g. a newly provisioned database); the
+    // repair migration seeds that counter, and this guard makes the failure loud
+    // instead of silently replacing somebody else's household record.
+    if (byFamilyId && byId === undefined) {
+      const sameFamily =
+        String(byFamilyId.full_name || "").trim().toLowerCase() ===
+          row.full_name.trim().toLowerCase() &&
+        String(byFamilyId.phone_number || "") === String(row.phone_number || "");
+      if (!sameFamily) {
+        db.exec("ROLLBACK");
+        return {
+          ok: false,
+          code: "FAMILY_ID_CONFLICT",
+          message:
+            "The Family ID issued by the database is already used by another family in this directory.",
+        };
+      }
+    }
+
     const existing = byId || byFamilyId;
 
     if (existing) {

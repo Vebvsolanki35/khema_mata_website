@@ -301,6 +301,28 @@ create index if not exists missing_location_reports_status_idx
 
 
 -- ---------------------------------------------------------------------------
+-- 1e. Key/value content store (`site_content`)
+--     The Parivaar store keeps its encrypted record rows, the current revision
+--     and the audit trail here, and the admin screen stores the UPI IDs here.
+--     Without this table a registration can be saved to `parivaar_registrations`
+--     but never published to the directory or counted by any instance.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.site_content (
+  key        text primary key,
+  value      text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.site_content
+  add column if not exists updated_at timestamptz not null default now();
+
+drop trigger if exists site_content_touch on public.site_content;
+create trigger site_content_touch
+  before update on public.site_content
+  for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
 -- 2. Columns added by later migrations (no-ops when already present)
 -- ---------------------------------------------------------------------------
 
@@ -362,6 +384,41 @@ begin
   end loop;
 end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 3b. Reserve the Family IDs that are already in use outside this database.
+--     The site ships one verified production family in its bundled replica
+--     (`94494-001`, the Chhapawda household).  On a database whose counter table
+--     is still empty the next registration in that village would be handed
+--     `94494-001` as well and would replace that family in the directory.
+--     Seeding the counter makes the next ID `94494-002`.
+--     `do nothing` on conflict: an existing counter is never lowered, so no
+--     Family ID is ever reused and no registration is affected.
+-- ---------------------------------------------------------------------------
+
+-- The counter row references the official LGD village (Rajasthan -> Bundi ->
+-- Talera -> Chhapawda, 94494), so that one location chain is ensured first.
+-- These are the same official codes the registration RPC itself auto-creates
+-- when a family registers into a village that is not in the database yet.
+insert into public.states (state_code, name_en, state_or_ut)
+values ('8', 'Rajasthan', 'State')
+on conflict (state_code) do nothing;
+
+insert into public.districts (district_code, state_code, name_en)
+values ('94', '8', 'Bundi')
+on conflict (district_code) do nothing;
+
+insert into public.subdistricts_blocks (subdistrict_code, district_code, state_code, name_en, admin_type)
+values ('6033', '94', '8', 'Talera', 'Tehsil')
+on conflict (subdistrict_code) do nothing;
+
+insert into public.villages (village_code, subdistrict_code, district_code, state_code, name_en)
+values ('94494', '6033', '94', '8', 'Chhapawda')
+on conflict (village_code) do nothing;
+
+insert into public.village_family_id_counters (village_code, last_seq, updated_at)
+values ('94494', 1, now())
+on conflict (village_code) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- 4. Canonical security-definer RPCs
@@ -1030,6 +1087,60 @@ create policy "missing_loc_admin_all"
   to authenticated
   using (public.is_trust_admin())
   with check (public.is_trust_admin());
+
+-- The content store is a mix of public settings (UPI IDs) and private
+-- Parivaar records (encrypted JSON blobs).  Visitors may read only the public
+-- settings; the server-side store uses the service role, which bypasses RLS.
+alter table public.site_content enable row level security;
+
+drop policy if exists "site_content_public_settings_read" on public.site_content;
+create policy "site_content_public_settings_read"
+  on public.site_content for select
+  to anon, authenticated
+  using (key in ('upi_id_1', 'upi_id_2'));
+
+drop policy if exists "site_content_admin_all" on public.site_content;
+create policy "site_content_admin_all"
+  on public.site_content for all
+  to authenticated
+  using (public.is_trust_admin())
+  with check (public.is_trust_admin());
+
+-- ---------------------------------------------------------------------------
+-- 5b. Table privileges
+--     Supabase grants these by default, but a database restored elsewhere (or a
+--     table created by a different role) does not have them, and RLS policies
+--     alone never grant access.  Every statement is a no-op when already
+--     granted, and roles are only referenced when they exist.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_role text;
+begin
+  foreach v_role in array array['anon', 'authenticated']
+  loop
+    continue when not exists (select 1 from pg_roles where rolname = v_role);
+
+    execute format('grant usage on schema public to %I', v_role);
+    execute format(
+      'grant select on public.states, public.districts, public.subdistricts_blocks, public.villages to %I',
+      v_role);
+    execute format(
+      'grant select on public.parivaar_registrations, public.registration_audit_log, public.missing_location_reports to %I',
+      v_role);
+    execute format('grant select on public.site_content to %I', v_role);
+  end loop;
+
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'grant insert, update, delete on public.states, public.districts, public.subdistricts_blocks, public.villages to authenticated';
+    execute 'grant update, delete on public.parivaar_registrations to authenticated';
+    execute 'grant insert, update, delete on public.missing_location_reports to authenticated';
+    execute 'grant select on public.trust_admins to authenticated';
+    execute 'grant insert, update, delete on public.site_content to authenticated';
+  end if;
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 6. EXECUTE privileges for the API roles
