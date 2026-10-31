@@ -101,6 +101,89 @@ function buildLegacyRpcParams(normalized) {
 }
 
 /**
+ * Parameters for the availability probe.
+ *
+ * They are deliberately invalid (empty name, no location, no phone, no address)
+ * so the RPC stops at its very first validation branch and returns
+ * `INVALID_NAME` without touching any table.  Two independent guards therefore
+ * stand between the probe and a write: the name check, then the location check.
+ */
+const RPC_PROBE_PARAMS = {
+  p_full_name: "",
+  p_state_code: "",
+  p_district_code: "",
+  p_subdistrict_code: "",
+  p_village_code: null,
+  p_thikana: "",
+  p_current_address: "",
+  p_phone_number: "",
+  p_consent_given: false,
+  p_thikana_same_as_village: false,
+};
+
+/**
+ * Safe, read-only health check for the registration RPC.
+ *
+ * Answers the only question that matters after a schema change: does
+ * `submit_parivaar_registration` resolve from PostgREST right now?
+ *
+ *   { function_available: true,  probe_code: "INVALID_NAME" }  -> healthy
+ *   { function_available: false, code: "PGRST202" }             -> still broken
+ *
+ * No personal data is sent, none is returned, and nothing is written.
+ */
+export async function probeRegistrationRpc() {
+  const client = getSupabaseServerClient();
+  if (!client) {
+    return {
+      function_available: false,
+      code: "UNCONFIGURED",
+      message: "Supabase credentials are not configured on the server.",
+    };
+  }
+
+  try {
+    const { data, error } = await withTimeout(
+      client.rpc("submit_parivaar_registration", RPC_PROBE_PARAMS),
+      RPC_TIMEOUT_MS,
+      "REGISTRATION_RPC_PROBE"
+    );
+
+    if (error) {
+      const mismatch = isSignatureMismatch(error);
+      return {
+        function_available: false,
+        code: error.code || "DATABASE_ERROR",
+        signature_mismatch: mismatch,
+        message: mismatch
+          ? "submit_parivaar_registration is not resolvable from the API. Apply supabase/migrations/20261101090000_ensure_parivaar_rpc_available.sql."
+          : "The database rejected the probe request.",
+        transient: isTransientRpcError(error),
+      };
+    }
+
+    // A resolvable, working RPC always rejects the empty probe with one of its
+    // own validation codes; anything else means we are talking to an unknown
+    // function shape.
+    const probeCode = data?.code || null;
+    const expected = probeCode === "INVALID_NAME" || probeCode === "MISSING_LOCATION";
+    return {
+      function_available: true,
+      probe_code: probeCode,
+      wrote_record: false,
+      unexpected_response: !expected,
+    };
+  } catch (err) {
+    return {
+      function_available: false,
+      code: "DATABASE_UNAVAILABLE",
+      message: "The registration RPC did not answer in time.",
+      transient: true,
+    };
+  }
+}
+
+/**
  * Calls the authoritative PostgreSQL registration RPC with one transient-error
  * retry.  Returns `{ ok, record }` or `{ ok:false, code, message, transient }`.
  */

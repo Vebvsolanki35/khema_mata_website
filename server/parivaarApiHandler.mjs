@@ -21,7 +21,10 @@ import {
   persistMissingLocationReport,
   syncDatabaseStateToPostgres,
 } from "./parivaarPostgresSync.mjs";
-import { createParivaarRegistration } from "./parivaarRegistration.mjs";
+import {
+  createParivaarRegistration,
+  probeRegistrationRpc,
+} from "./parivaarRegistration.mjs";
 import { buildCsvBuffer, buildXlsxWorkbookBuffer } from "./xlsxBuilder.mjs";
 
 function sendJson(res, statusCode, payload, options = {}) {
@@ -364,6 +367,19 @@ export async function handleParivaarApiRequest(req, res) {
           ...consistency,
           revision: replica.revision,
           hydration: getHydrationState(),
+        });
+      }
+
+      // Diagnostic added after the 2026-11-01 registration outage: a safe,
+      // PII-free way to confirm from production whether the registration RPC is
+      // resolvable again. The probe sends intentionally invalid input, so the
+      // RPC always stops at its first validation branch and never writes a row.
+      if (action === "rpc-health") {
+        const probe = await probeRegistrationRpc();
+        return sendJson(res, probe.function_available ? 200 : 503, {
+          ok: probe.function_available,
+          ...probe,
+          checked_at: new Date().toISOString(),
         });
       }
 

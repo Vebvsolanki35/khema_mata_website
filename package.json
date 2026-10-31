@@ -13,7 +13,8 @@
     "lgd:supabase": "node scripts/import-lgd-locations.mjs --supabase",
     "test:parivaar": "node scripts/test-parivaar.mjs",
     "lgd:build": "node scripts/build-lgd-sqlite.mjs",
-    "bench": "node scripts/bench-parivaar.mjs"
+    "bench": "node scripts/bench-parivaar.mjs",
+    "test:parivaar:sql": "node scripts/test-parivaar-sql.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
@@ -23,6 +24,7 @@
     "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
